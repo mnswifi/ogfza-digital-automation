@@ -20,6 +20,7 @@ This contains everything you need to run your app locally.
 ## Environment Variables
 
 Create a .env file in the project root and add the following
+```
 - DB_HOST=localhost
 - DB_PORT=1433
 - DB_NAME=PetroflowDB
@@ -30,7 +31,7 @@ Create a .env file in the project root and add the following
 - SMTP_PORT=587
 - SMTP_USER=your_smtp_email_here
 - SMTP_PASS=your_smtp_password_here
-
+```
 ## Running SQL server locally with Docker
 
 ### Create & Run the MSSQL Server

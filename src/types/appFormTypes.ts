@@ -3,7 +3,7 @@ import type { Permit } from '@/middleware/types.middleware';
 import {
     createInitialAttendanceForm,
     createInitialCertificationForm,
-    createInitialCompanyForm,
+    createInitialCompanyApplicationForm,
     createInitialEmployeeForm,
     createInitialIncidentForm,
     createInitialOpsForm,
@@ -12,7 +12,7 @@ import {
     createInitialUploadDocForm,
 } from '../hooks/appInitialState';
 
-export type CompanyForm = ReturnType<typeof createInitialCompanyForm>;
+export type CompanyApplicationForm = ReturnType<typeof createInitialCompanyApplicationForm>;
 export type IncidentForm = ReturnType<typeof createInitialIncidentForm>;
 export type PermitForm = ReturnType<typeof createInitialPermitForm>;
 export type EmployeeForm = ReturnType<typeof createInitialEmployeeForm>;

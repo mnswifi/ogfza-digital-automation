@@ -2,6 +2,7 @@ import React, { Dispatch, SetStateAction } from 'react';
 import {
     User,
     Company,
+    CompanyApplication,
     Permit,
     Operation,
     Revenue,
@@ -32,18 +33,10 @@ import Incidents from '@/src/views/Incidents';
 import Operations from '@/src/views/Operations';
 import HR from '@/src/views/HR';
 import Contractors from '@/src/views/Contractors';
+import type { CompanyApplicationForm } from '@/src/types/appFormTypes';
 
 type HrTab = 'employees' | 'attendance' | 'certs' | 'shifts' | 'safety';
-
-type NewCompanyForm = {
-    name: string;
-    licenseNo: string;
-    tin: string;
-    sector: string;
-    type: string;
-    leaseInfo: string;
-    representativeEmail: string;
-};
+type NewCompanyForm = CompanyApplicationForm;
 
 type NewIncidentForm = {
     company_name: string;
@@ -118,6 +111,7 @@ type ContentRouterProps = {
 
     stats: Stats | null;
     companies: Company[];
+    companyApplications: CompanyApplication[];
     permits: Permit[];
     operations: Operation[];
     revenue: Revenue[];
@@ -143,6 +137,11 @@ type ContentRouterProps = {
     newCompany: NewCompanyForm;
     setNewCompany: Dispatch<SetStateAction<NewCompanyForm>>;
     registerCompanyHandler: FormActionHandler;
+    reviewCompanyApplicationHandler: (
+        applicationId: number,
+        decision: 'Approved' | 'Rejected',
+        rejectionReason?: string
+    ) => void | Promise<void>;
 
     showIncidentModal: boolean;
     setShowIncidentModal: Dispatch<SetStateAction<boolean>>;
@@ -212,6 +211,7 @@ export default function ContentRouter({
 
     stats,
     companies,
+    companyApplications,
     permits,
     operations,
     revenue,
@@ -237,6 +237,7 @@ export default function ContentRouter({
     newCompany,
     setNewCompany,
     registerCompanyHandler,
+    reviewCompanyApplicationHandler,
 
     showIncidentModal,
     setShowIncidentModal,
@@ -326,12 +327,14 @@ export default function ContentRouter({
                 <Companies
                     user={user}
                     companies={companies}
+                    companyApplications={companyApplications}
                     showRegModal={showRegModal}
                     setShowRegModal={setShowRegModal}
                     newCompany={newCompany}
                     setNewCompany={setNewCompany}
                     actionLoading={actionLoading}
                     onRegisterCompany={registerCompanyHandler}
+                    onReviewApplication={reviewCompanyApplicationHandler}
                 />
             );
 

@@ -29,10 +29,30 @@ export interface Stats {
 export interface Company {
     id: number;
     name: string;
-    license_no: string;
-    type: string;
+    license_no: string | null;
+    incorporation_type: string | null;
+    free_zone_location: string | null;
     status: string;
-    joined_date: string;
+    approved_date: string | null;
+    representative_email?: string | null;
+    approved_application_id?: number | null;
+}
+
+export interface CompanyApplication {
+    id: number;
+    application_reference: string;
+    company_name: string;
+    incorporation_type: string;
+    free_zone_location: string;
+    status: string;
+    linked_company_id?: number | null;
+    submitted_at: string | null;
+    reviewed_at?: string | null;
+    approved_at?: string | null;
+    rejected_at?: string | null;
+    rejection_reason?: string | null;
+    primary_contact_name?: string | null;
+    primary_contact_email?: string | null;
 }
 
 export interface Permit {

@@ -1,6 +1,8 @@
 import type { Dispatch, SetStateAction, React } from 'react';
 import type { Permit, User } from '@/middleware/types.middleware';
 import toast from 'react-hot-toast';
+import { createInitialCompanyApplicationForm } from './appInitialState';
+import type { CompanyApplicationForm } from '@/src/types/appFormTypes';
 
 type SetUser = Dispatch<SetStateAction<User | null>>;
 type SetToken = Dispatch<SetStateAction<string | null>>;
@@ -68,12 +70,7 @@ export const handleChangePassword = (
             const updatedUser = { ...user!, mustChangePassword: false };
             setUser(updatedUser);
             localStorage.setItem('petroflow_user', JSON.stringify(updatedUser));
-            // Reset tab
-            if (updatedUser.role === 'Operations') setActiveTab('operations');
-            else if (updatedUser.role === 'Finance') setActiveTab('finance');
-            else if (updatedUser.role === 'Compliance') setActiveTab('companies');
-            else if (updatedUser.role === 'HR Manager') setActiveTab('dashboard');
-            else setActiveTab('dashboard');
+            setActiveTab(getInitialTabForRole(updatedUser.role));
             toast.success('Password changed successfully.');
         } else {
             toast.error('Failed to change password.');
@@ -85,9 +82,9 @@ export const handleChangePassword = (
 };
 
 export const handleRegisterCompany = (
-    newCompany: { name: string; licenseNo: string; tin: string; sector: string; type: string; leaseInfo: string; representativeEmail: string },
+    newCompany: CompanyApplicationForm,
     setShowRegModal: (show: boolean) => void,
-    setNewCompany: (company: { name: string; licenseNo: string; tin: string; sector: string; type: string; leaseInfo: string; representativeEmail: string }) => void,
+    setNewCompany: (company: CompanyApplicationForm) => void,
     actionLoading: boolean,
     setActionLoading: (loading: boolean) => void,
     token: string | null,
@@ -96,7 +93,7 @@ export const handleRegisterCompany = (
     e.preventDefault();
     setActionLoading(true);
     try {
-        const res = await fetch('/api/companies', {
+        const res = await fetch('/api/company-applications', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -105,12 +102,66 @@ export const handleRegisterCompany = (
             body: JSON.stringify(newCompany),
         });
         if (res.ok) {
+            const data = await res.json();
             setShowRegModal(false);
-            setNewCompany({ name: '', licenseNo: '', tin: '', sector: '', type: 'Energy', leaseInfo: '', representativeEmail: '' });
+            setNewCompany(createInitialCompanyApplicationForm());
             fetchData();
+            toast.success(
+                data?.applicationReference
+                    ? `Application submitted: ${data.applicationReference}`
+                    : 'Company application submitted successfully.'
+            );
+        } else {
+            const data = await res.json().catch(() => null);
+            toast.error(data?.error || 'Failed to submit company application.');
         }
     } catch (err) {
         console.error(err);
+        toast.error('An error occurred while submitting the company application.');
+    } finally {
+        setActionLoading(false);
+    }
+};
+
+export const handleReviewCompanyApplication = (
+    actionLoading: boolean,
+    setActionLoading: (loading: boolean) => void,
+    token: string | null,
+    fetchData: () => void
+) => async (
+    applicationId: number,
+    decision: 'Approved' | 'Rejected',
+    rejectionReason?: string
+) => {
+    if (actionLoading) return;
+
+    setActionLoading(true);
+    try {
+        const res = await fetch(`/api/company-applications/${applicationId}/decision`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ decision, rejectionReason }),
+        });
+
+        if (res.ok) {
+            const data = await res.json().catch(() => null);
+            fetchData();
+            toast.success(
+                data?.message ||
+                    (decision === 'Approved'
+                        ? 'Company application approved successfully.'
+                        : 'Company application rejected successfully.')
+            );
+        } else {
+            const data = await res.json().catch(() => null);
+            toast.error(data?.error || `Failed to ${decision.toLowerCase()} application.`);
+        }
+    } catch (err) {
+        console.error(err);
+        toast.error(`An error occurred while processing the ${decision.toLowerCase()} action.`);
     } finally {
         setActionLoading(false);
     }

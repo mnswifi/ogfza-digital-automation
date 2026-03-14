@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { handleRegisterCompany } from '../useAuthSessions';
-import { createInitialCompanyForm } from '../appInitialState';
-import type { CompanyForm, SharedFormHookParams } from '../../types/appFormTypes';
+import { handleRegisterCompany, handleReviewCompanyApplication } from '../useAuthSessions';
+import { createInitialCompanyApplicationForm } from '../appInitialState';
+import type { CompanyApplicationForm, SharedFormHookParams } from '../../types/appFormTypes';
 
 export function useCompanyForms({
     token,
@@ -10,12 +10,21 @@ export function useCompanyForms({
     setActionLoading,
 }: SharedFormHookParams) {
     const [showRegModal, setShowRegModal] = useState(false);
-    const [newCompany, setNewCompany] = useState<CompanyForm>(createInitialCompanyForm());
+    const [newCompany, setNewCompany] = useState<CompanyApplicationForm>(
+        createInitialCompanyApplicationForm()
+    );
 
     const registerCompanyHandler = handleRegisterCompany(
         newCompany,
         setShowRegModal,
         setNewCompany,
+        actionLoading,
+        setActionLoading,
+        token,
+        fetchData
+    );
+
+    const reviewCompanyApplicationHandler = handleReviewCompanyApplication(
         actionLoading,
         setActionLoading,
         token,
@@ -28,5 +37,6 @@ export function useCompanyForms({
         newCompany,
         setNewCompany,
         registerCompanyHandler,
+        reviewCompanyApplicationHandler,
     };
 }

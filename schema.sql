@@ -13,7 +13,7 @@ CREATE TABLE users (
 CREATE TABLE companies (
   id INT IDENTITY(1,1) PRIMARY KEY,
   name NVARCHAR(255) NOT NULL,
-  license_no NVARCHAR(255) UNIQUE NULL,
+  license_no NVARCHAR(255) NULL,
   tin NVARCHAR(255) NULL,
   sector NVARCHAR(255) NULL,
   type NVARCHAR(255) NULL,
@@ -22,6 +22,10 @@ CREATE TABLE companies (
   lease_info NVARCHAR(MAX) NULL,
   representative_email NVARCHAR(255) NULL
 );
+
+CREATE UNIQUE INDEX UX_companies_license_no_non_null
+  ON companies(license_no)
+  WHERE license_no IS NOT NULL;
 
 CREATE TABLE permits (
   id INT IDENTITY(1,1) PRIMARY KEY,

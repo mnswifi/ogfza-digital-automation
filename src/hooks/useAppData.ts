@@ -3,6 +3,7 @@ import { Stats } from 'motion/react';
 import {
     User,
     Company,
+    CompanyApplication,
     Permit,
     Operation,
     Revenue,
@@ -30,6 +31,7 @@ type UseAppDataParams = {
 export function useAppData({ token, user, onAuthFail }: UseAppDataParams) {
     const [stats, setStats] = useState<Stats<any> | null>(null);
     const [companies, setCompanies] = useState<Company[]>([]);
+    const [companyApplications, setCompanyApplications] = useState<CompanyApplication[]>([]);
     const [permits, setPermits] = useState<Permit[]>([]);
     const [operations, setOperations] = useState<Operation[]>([]);
     const [revenue, setRevenue] = useState<Revenue[]>([]);
@@ -58,10 +60,19 @@ export function useAppData({ token, user, onAuthFail }: UseAppDataParams) {
 
         try {
             const headers = { Authorization: `Bearer ${token}` };
+            const canAccessCompanyApplications =
+                Boolean(user?.role?.includes('Admin')) ||
+                Boolean(user?.role?.includes('Compliance')) ||
+                Boolean(user?.role?.includes('Contractor'));
 
-            const [s, c, p, o, r, comp, a, inc, emp, att, certs, shf, hrs, usersData] = await Promise.all([
+            const [s, c, companyApps, p, o, r, comp, a, inc, emp, att, certs, shf, hrs, usersData] = await Promise.all([
                 fetch('/api/dashboard/stats', { headers }).then((res) => res.json()),
                 fetch('/api/companies', { headers }).then((res) => res.json()),
+                canAccessCompanyApplications
+                    ? fetch('/api/company-applications', { headers }).then((res) =>
+                        res.ok ? res.json() : []
+                    )
+                    : Promise.resolve([]),
                 fetch('/api/permits', { headers }).then((res) => res.json()),
                 fetch('/api/operations', { headers }).then((res) => res.json()),
                 fetch('/api/revenue', { headers }).then((res) => res.json()),
@@ -80,6 +91,7 @@ export function useAppData({ token, user, onAuthFail }: UseAppDataParams) {
 
             setStats(s);
             setCompanies(c);
+            setCompanyApplications(companyApps);
             setPermits(p);
             setOperations(o);
             setRevenue(r);
@@ -117,6 +129,7 @@ export function useAppData({ token, user, onAuthFail }: UseAppDataParams) {
     return {
         stats,
         companies,
+        companyApplications,
         permits,
         operations,
         revenue,

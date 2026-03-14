@@ -34,6 +34,7 @@ export default function App() {
   const {
     stats,
     companies,
+    companyApplications,
     permits,
     operations,
     revenue,
@@ -67,6 +68,7 @@ export default function App() {
     newCompany,
     setNewCompany,
     registerCompanyHandler,
+    reviewCompanyApplicationHandler,
 
     showIncidentModal,
     setShowIncidentModal,
@@ -213,6 +215,7 @@ export default function App() {
                 userHasRole={userHasRole}
                 stats={stats}
                 companies={companies}
+                companyApplications={companyApplications}
                 permits={permits}
                 operations={operations}
                 revenue={revenue}
@@ -236,6 +239,7 @@ export default function App() {
                 newCompany={newCompany}
                 setNewCompany={setNewCompany}
                 registerCompanyHandler={registerCompanyHandler}
+                reviewCompanyApplicationHandler={reviewCompanyApplicationHandler}
                 showIncidentModal={showIncidentModal}
                 setShowIncidentModal={setShowIncidentModal}
                 newIncident={newIncident}

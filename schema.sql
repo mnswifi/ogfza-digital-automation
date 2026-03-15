@@ -14,6 +14,7 @@ CREATE TABLE companies (
   id INT IDENTITY(1,1) PRIMARY KEY,
   name NVARCHAR(255) NOT NULL,
   license_no NVARCHAR(255) NULL,
+  license_type NVARCHAR(100) NULL,
   tin NVARCHAR(255) NULL,
   sector NVARCHAR(255) NULL,
   type NVARCHAR(255) NULL,

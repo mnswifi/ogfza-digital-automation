@@ -106,6 +106,7 @@ type ContentRouterProps = {
     activeTab: AppTab;
     setActiveTab: (tab: AppTab) => void;
 
+    token: string | null;
     user: User;
     userHasRole: (roleNeeded: string) => boolean;
 
@@ -134,13 +135,26 @@ type ContentRouterProps = {
 
     showRegModal: boolean;
     setShowRegModal: Dispatch<SetStateAction<boolean>>;
+    editingCompanyApplicationId: number | null;
+    setEditingCompanyApplicationId: Dispatch<SetStateAction<number | null>>;
     newCompany: NewCompanyForm;
     setNewCompany: Dispatch<SetStateAction<NewCompanyForm>>;
     registerCompanyHandler: FormActionHandler;
     reviewCompanyApplicationHandler: (
         applicationId: number,
-        decision: 'Approved' | 'Rejected',
-        rejectionReason?: string
+        decision: 'Approved' | 'Rejected' | 'Returned',
+        rejectionReason?: string,
+        queryNote?: string,
+        approvedLicenseType?: string
+    ) => void | Promise<void>;
+    confirmCompanyApplicationPaymentHandler: (
+        applicationId: number,
+        paymentReference?: string,
+        approvedLicenseType?: string
+    ) => void | Promise<void>;
+    submitCompanyApplicationPaymentHandler: (
+        applicationId: number,
+        paymentReference: string
     ) => void | Promise<void>;
 
     showIncidentModal: boolean;
@@ -206,6 +220,7 @@ export default function ContentRouter({
     activeTab,
     setActiveTab,
 
+    token,
     user,
     userHasRole,
 
@@ -234,10 +249,14 @@ export default function ContentRouter({
 
     showRegModal,
     setShowRegModal,
+    editingCompanyApplicationId,
+    setEditingCompanyApplicationId,
     newCompany,
     setNewCompany,
     registerCompanyHandler,
     reviewCompanyApplicationHandler,
+    confirmCompanyApplicationPaymentHandler,
+    submitCompanyApplicationPaymentHandler,
 
     showIncidentModal,
     setShowIncidentModal,
@@ -325,16 +344,21 @@ export default function ContentRouter({
         case 'companies':
             return (
                 <Companies
+                    token={token}
                     user={user}
                     companies={companies}
                     companyApplications={companyApplications}
                     showRegModal={showRegModal}
                     setShowRegModal={setShowRegModal}
+                    editingCompanyApplicationId={editingCompanyApplicationId}
+                    setEditingCompanyApplicationId={setEditingCompanyApplicationId}
                     newCompany={newCompany}
                     setNewCompany={setNewCompany}
                     actionLoading={actionLoading}
                     onRegisterCompany={registerCompanyHandler}
                     onReviewApplication={reviewCompanyApplicationHandler}
+                    onConfirmApplicationPayment={confirmCompanyApplicationPaymentHandler}
+                    onSubmitApplicationPayment={submitCompanyApplicationPaymentHandler}
                 />
             );
 

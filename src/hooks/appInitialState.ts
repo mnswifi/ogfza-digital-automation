@@ -1,7 +1,10 @@
+import { mergeCompanyApplicationDocuments } from '@/src/constants/companyApplication';
+
 export const createInitialCompanyApplicationForm = () => ({
     companyName: '',
     incorporationType: '',
     freeZoneLocation: '',
+    requestedLicenseType: '',
     globalHeadOfficeAddress: '',
     globalPhone1: '',
     globalEmail: '',
@@ -39,6 +42,7 @@ export const createInitialCompanyApplicationForm = () => ({
     declarationName: '',
     declarationDesignation: '',
     declarationSignatureDate: '',
+    documents: mergeCompanyApplicationDocuments(),
 });
 
 export const createInitialIncidentForm = () => ({

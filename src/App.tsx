@@ -65,10 +65,14 @@ export default function App() {
 
     showRegModal,
     setShowRegModal,
+    editingCompanyApplicationId,
+    setEditingCompanyApplicationId,
     newCompany,
     setNewCompany,
     registerCompanyHandler,
     reviewCompanyApplicationHandler,
+    confirmCompanyApplicationPaymentHandler,
+    submitCompanyApplicationPaymentHandler,
 
     showIncidentModal,
     setShowIncidentModal,
@@ -211,6 +215,7 @@ export default function App() {
               <ContentRouter
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
+                token={token}
                 user={user}
                 userHasRole={userHasRole}
                 stats={stats}
@@ -236,10 +241,14 @@ export default function App() {
                 actionLoading={actionLoading}
                 showRegModal={showRegModal}
                 setShowRegModal={setShowRegModal}
+                editingCompanyApplicationId={editingCompanyApplicationId}
+                setEditingCompanyApplicationId={setEditingCompanyApplicationId}
                 newCompany={newCompany}
                 setNewCompany={setNewCompany}
                 registerCompanyHandler={registerCompanyHandler}
                 reviewCompanyApplicationHandler={reviewCompanyApplicationHandler}
+                confirmCompanyApplicationPaymentHandler={confirmCompanyApplicationPaymentHandler}
+                submitCompanyApplicationPaymentHandler={submitCompanyApplicationPaymentHandler}
                 showIncidentModal={showIncidentModal}
                 setShowIncidentModal={setShowIncidentModal}
                 newIncident={newIncident}

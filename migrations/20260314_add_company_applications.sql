@@ -11,6 +11,8 @@ BEGIN TRY
             company_name NVARCHAR(255) NULL,
             incorporation_type NVARCHAR(100) NULL,
             free_zone_location NVARCHAR(255) NULL,
+            requested_license_type NVARCHAR(100) NULL,
+            estimated_fee_usd DECIMAL(18,2) NULL,
 
             global_head_office_address NVARCHAR(MAX) NULL,
             global_phone_1 NVARCHAR(50) NULL,
@@ -63,12 +65,23 @@ BEGIN TRY
             submitted_by_user_id INT NULL,
             reviewed_by_user_id INT NULL,
             approved_by_user_id INT NULL,
+            payment_submitted_by_user_id INT NULL,
+            payment_confirmed_by_user_id INT NULL,
             submitted_at DATETIME2 NULL,
             reviewed_at DATETIME2 NULL,
             approved_at DATETIME2 NULL,
+            payment_status NVARCHAR(100) NULL,
+            payment_reference NVARCHAR(255) NULL,
+            payment_submitted_at DATETIME2 NULL,
+            payment_confirmed_at DATETIME2 NULL,
             returned_at DATETIME2 NULL,
+            returned_by_user_id INT NULL,
+            resubmitted_at DATETIME2 NULL,
+            query_note NVARCHAR(MAX) NULL,
             rejected_at DATETIME2 NULL,
             rejection_reason NVARCHAR(MAX) NULL,
+            approved_license_type NVARCHAR(100) NULL,
+            approved_fee_usd DECIMAL(18,2) NULL,
 
             internal_company_profile NVARCHAR(MAX) NULL,
             internal_activity_1 NVARCHAR(255) NULL,
@@ -95,8 +108,37 @@ BEGIN TRY
                     'Under Review',
                     'Awaiting Admin Approval',
                     'Returned',
+                    'Approved Pending Payment',
+                    'Payment Submitted',
+                    'Licence Issued',
                     'Approved',
                     'Rejected'
+                )
+            ),
+            CONSTRAINT CK_company_applications_requested_license_type CHECK (
+                requested_license_type IS NULL
+                OR requested_license_type IN (
+                    'Free Zone Service Licence',
+                    'Free Zone Enterprise Licence',
+                    'Free Zone Enterprise - Special Activity Licence',
+                    'Free Zone Developer Licence'
+                )
+            ),
+            CONSTRAINT CK_company_applications_approved_license_type CHECK (
+                approved_license_type IS NULL
+                OR approved_license_type IN (
+                    'Free Zone Service Licence',
+                    'Free Zone Enterprise Licence',
+                    'Free Zone Enterprise - Special Activity Licence',
+                    'Free Zone Developer Licence'
+                )
+            ),
+            CONSTRAINT CK_company_applications_payment_status CHECK (
+                payment_status IS NULL
+                OR payment_status IN (
+                    'Awaiting Contractor Payment',
+                    'Payment Submitted',
+                    'Paid'
                 )
             ),
             CONSTRAINT CK_company_applications_incorporation_type CHECK (
@@ -122,7 +164,13 @@ BEGIN TRY
                 REFERENCES dbo.users(id),
             CONSTRAINT FK_company_applications_reviewed_by_user FOREIGN KEY (reviewed_by_user_id)
                 REFERENCES dbo.users(id),
+            CONSTRAINT FK_company_applications_returned_by_user FOREIGN KEY (returned_by_user_id)
+                REFERENCES dbo.users(id),
             CONSTRAINT FK_company_applications_approved_by_user FOREIGN KEY (approved_by_user_id)
+                REFERENCES dbo.users(id),
+            CONSTRAINT FK_company_applications_payment_submitted_by_user FOREIGN KEY (payment_submitted_by_user_id)
+                REFERENCES dbo.users(id),
+            CONSTRAINT FK_company_applications_payment_confirmed_by_user FOREIGN KEY (payment_confirmed_by_user_id)
                 REFERENCES dbo.users(id)
         );
     END;
@@ -147,6 +195,136 @@ BEGIN TRY
     BEGIN
         CREATE INDEX IX_company_applications_submitted_by_user_id
             ON dbo.company_applications(submitted_by_user_id);
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'IX_company_applications_payment_confirmed_by_user_id'
+          AND object_id = OBJECT_ID(N'dbo.company_applications')
+    )
+    BEGIN
+        CREATE INDEX IX_company_applications_payment_confirmed_by_user_id
+            ON dbo.company_applications(payment_confirmed_by_user_id);
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'IX_company_applications_payment_submitted_by_user_id'
+          AND object_id = OBJECT_ID(N'dbo.company_applications')
+    )
+    BEGIN
+        CREATE INDEX IX_company_applications_payment_submitted_by_user_id
+            ON dbo.company_applications(payment_submitted_by_user_id);
+    END;
+
+    IF OBJECT_ID(N'dbo.company_application_documents', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.company_application_documents (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            application_id INT NOT NULL,
+            document_type NVARCHAR(100) NOT NULL,
+            file_name NVARCHAR(255) NOT NULL,
+            created_at DATETIME2 NOT NULL
+                CONSTRAINT DF_company_application_documents_created_at DEFAULT SYSDATETIME(),
+            updated_at DATETIME2 NOT NULL
+                CONSTRAINT DF_company_application_documents_updated_at DEFAULT SYSDATETIME(),
+            CONSTRAINT FK_company_application_documents_application FOREIGN KEY (application_id)
+                REFERENCES dbo.company_applications(id),
+            CONSTRAINT UQ_company_application_documents_type UNIQUE (application_id, document_type),
+            CONSTRAINT CK_company_application_documents_type CHECK (
+                document_type IN (
+                    'dpr_certificate',
+                    'certificate_of_incorporation',
+                    'certificate_or_notarized_overseas_incorporation',
+                    'memorandum_and_articles_of_association',
+                    'company_brochure_or_profile',
+                    'environmental_impact_assessment_report',
+                    'company_contact_details',
+                    'feasibility_study_business_plan',
+                    'financial_and_personnel_profile',
+                    'sources_of_funding',
+                    'audited_accounts_last_three_years',
+                    'facility_lease_confirmation',
+                    'oil_and_gas_affidavit',
+                    'pre_incorporation_meeting_with_promoters',
+                    'share_capital_and_stamp_duty_evidence',
+                    'financial_profile_fdi_and_personnel_profile',
+                    'project_summary',
+                    'company_stamp_or_seal',
+                    'notarized_overseas_incorporation'
+                )
+            )
+        );
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'IX_company_application_documents_application_id'
+          AND object_id = OBJECT_ID(N'dbo.company_application_documents')
+    )
+    BEGIN
+        CREATE INDEX IX_company_application_documents_application_id
+            ON dbo.company_application_documents(application_id, document_type);
+    END;
+
+    IF OBJECT_ID(N'dbo.company_application_events', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.company_application_events (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            application_id INT NOT NULL,
+            event_type NVARCHAR(100) NOT NULL,
+            actor_user_id INT NULL,
+            actor_name NVARCHAR(255) NULL,
+            actor_role NVARCHAR(255) NULL,
+            from_status NVARCHAR(100) NULL,
+            to_status NVARCHAR(100) NULL,
+            note NVARCHAR(MAX) NULL,
+            metadata_json NVARCHAR(MAX) NULL,
+            created_at DATETIME2 NOT NULL
+                CONSTRAINT DF_company_application_events_created_at DEFAULT SYSDATETIME(),
+            CONSTRAINT FK_company_application_events_application FOREIGN KEY (application_id)
+                REFERENCES dbo.company_applications(id),
+            CONSTRAINT FK_company_application_events_actor FOREIGN KEY (actor_user_id)
+                REFERENCES dbo.users(id),
+            CONSTRAINT CK_company_application_events_type CHECK (
+                event_type IN (
+                    'Submitted',
+                    'Resubmitted',
+                    'ForwardedToAdmin',
+                    'PaymentSubmitted',
+                    'ReturnedForRevision',
+                    'RejectedByCompliance',
+                    'RejectedByAdmin',
+                    'ApprovedByAdmin',
+                    'LicenseIssued'
+                )
+            )
+        );
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'IX_company_application_events_application_created'
+          AND object_id = OBJECT_ID(N'dbo.company_application_events')
+    )
+    BEGIN
+        CREATE INDEX IX_company_application_events_application_created
+            ON dbo.company_application_events(application_id, created_at, id);
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'IX_company_application_events_actor_user_id'
+          AND object_id = OBJECT_ID(N'dbo.company_application_events')
+    )
+    BEGIN
+        CREATE INDEX IX_company_application_events_actor_user_id
+            ON dbo.company_application_events(actor_user_id);
     END;
 
     -- Keep representative_email on companies.
@@ -181,6 +359,12 @@ BEGIN TRY
     BEGIN
         ALTER TABLE dbo.companies
             ADD free_zone_location NVARCHAR(255) NULL;
+    END;
+
+    IF COL_LENGTH(N'dbo.companies', N'license_type') IS NULL
+    BEGIN
+        ALTER TABLE dbo.companies
+            ADD license_type NVARCHAR(100) NULL;
     END;
 
     IF COL_LENGTH(N'dbo.companies', N'approved_application_id') IS NULL

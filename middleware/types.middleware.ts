@@ -30,6 +30,7 @@ export interface Company {
     id: number;
     name: string;
     license_no: string | null;
+    license_type?: string | null;
     incorporation_type: string | null;
     free_zone_location: string | null;
     status: string;
@@ -38,21 +39,169 @@ export interface Company {
     approved_application_id?: number | null;
 }
 
+export interface CompanyDetail extends Company {
+    tin?: string | null;
+    sector?: string | null;
+    lease_info?: string | null;
+    application_reference?: string | null;
+    application_status?: string | null;
+    requested_license_type?: string | null;
+    approved_license_type?: string | null;
+    estimated_fee_usd?: number | string | null;
+    approved_fee_usd?: number | string | null;
+    payment_status?: string | null;
+    payment_reference?: string | null;
+    payment_submitted_at?: string | null;
+    payment_submitted_by_name?: string | null;
+    payment_confirmed_at?: string | null;
+    payment_confirmed_by_name?: string | null;
+    submitted_at?: string | null;
+    reviewed_at?: string | null;
+    application_approved_at?: string | null;
+    rejected_at?: string | null;
+    rejection_reason?: string | null;
+    submitted_by_name?: string | null;
+    reviewed_by_name?: string | null;
+    approved_by_name?: string | null;
+    global_head_office_address?: string | null;
+    global_phone_1?: string | null;
+    global_email?: string | null;
+    global_phone_2?: string | null;
+    global_website?: string | null;
+    nigeria_office_address?: string | null;
+    nigeria_phone_1?: string | null;
+    nigeria_email?: string | null;
+    nigeria_phone_2?: string | null;
+    nigeria_website?: string | null;
+    primary_contact_name?: string | null;
+    primary_contact_designation?: string | null;
+    primary_contact_phone?: string | null;
+    primary_contact_email?: string | null;
+    secondary_contact_name?: string | null;
+    secondary_contact_designation?: string | null;
+    secondary_contact_phone?: string | null;
+    secondary_contact_email?: string | null;
+    present_business_operations?: string | null;
+    dpr_registration_number?: string | null;
+    activity_description?: string | null;
+    countries_of_operation_west_africa?: string | null;
+    proposed_business_activity?: string | null;
+    undeveloped_land_sqm?: number | string | null;
+    developed_land_sqm?: number | string | null;
+    concrete_stacking_area_sqm?: number | string | null;
+    warehouse_space_sqm?: number | string | null;
+    factory_premises_sqm?: number | string | null;
+    office_accommodation_sqm?: number | string | null;
+    equipment_requirement?: string | null;
+    residential_accommodation_personnel_count?: number | null;
+    imports_summary?: string | null;
+    exports_summary?: string | null;
+    proposed_commencement_date?: string | null;
+    declaration_name?: string | null;
+    declaration_designation?: string | null;
+    declaration_signature_date?: string | null;
+    documents?: CompanyApplicationDocument[];
+}
+
 export interface CompanyApplication {
     id: number;
     application_reference: string;
     company_name: string;
-    incorporation_type: string;
     free_zone_location: string;
     status: string;
+    requested_license_type?: string | null;
+    approved_license_type?: string | null;
+    estimated_fee_usd?: number | string | null;
+    approved_fee_usd?: number | string | null;
+    payment_status?: string | null;
+    payment_reference?: string | null;
+    payment_submitted_at?: string | null;
     linked_company_id?: number | null;
+    linked_company_license_no?: string | null;
     submitted_at: string | null;
+    submitted_by_name?: string | null;
     reviewed_at?: string | null;
+    returned_at?: string | null;
+    resubmitted_at?: string | null;
+    query_note?: string | null;
     approved_at?: string | null;
+    payment_confirmed_at?: string | null;
     rejected_at?: string | null;
     rejection_reason?: string | null;
     primary_contact_name?: string | null;
     primary_contact_email?: string | null;
+}
+
+export interface CompanyApplicationEvent {
+    id: number;
+    application_id: number;
+    event_type: string;
+    actor_user_id?: number | null;
+    actor_name?: string | null;
+    actor_role?: string | null;
+    from_status?: string | null;
+    to_status?: string | null;
+    note?: string | null;
+    metadata_json?: string | null;
+    created_at: string;
+}
+
+export interface CompanyApplicationDocument {
+    id?: number;
+    application_id?: number;
+    document_type: string;
+    file_name: string;
+    created_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface CompanyApplicationDetail extends CompanyApplication {
+    incorporation_type?: string | null;
+    payment_reference?: string | null;
+    payment_submitted_by_name?: string | null;
+    payment_confirmed_by_name?: string | null;
+    linked_company_license_no?: string | null;
+    submitted_by_name?: string | null;
+    reviewed_by_name?: string | null;
+    returned_by_name?: string | null;
+    approved_by_name?: string | null;
+    global_head_office_address?: string | null;
+    global_phone_1?: string | null;
+    global_email?: string | null;
+    global_phone_2?: string | null;
+    global_website?: string | null;
+    nigeria_office_address?: string | null;
+    nigeria_phone_1?: string | null;
+    nigeria_email?: string | null;
+    nigeria_phone_2?: string | null;
+    nigeria_website?: string | null;
+    primary_contact_designation?: string | null;
+    primary_contact_phone?: string | null;
+    secondary_contact_name?: string | null;
+    secondary_contact_designation?: string | null;
+    secondary_contact_phone?: string | null;
+    secondary_contact_email?: string | null;
+    present_business_operations?: string | null;
+    dpr_registration_number?: string | null;
+    activity_description?: string | null;
+    countries_of_operation_west_africa?: string | null;
+    proposed_business_activity?: string | null;
+    undeveloped_land_sqm?: number | string | null;
+    developed_land_sqm?: number | string | null;
+    concrete_stacking_area_sqm?: number | string | null;
+    warehouse_space_sqm?: number | string | null;
+    factory_premises_sqm?: number | string | null;
+    office_accommodation_sqm?: number | string | null;
+    equipment_requirement?: string | null;
+    residential_accommodation_personnel_count?: number | null;
+    imports_summary?: string | null;
+    exports_summary?: string | null;
+    proposed_commencement_date?: string | null;
+    declaration_name?: string | null;
+    declaration_designation?: string | null;
+    declaration_signature_date?: string | null;
+    documents?: CompanyApplicationDocument[];
+    events?: CompanyApplicationEvent[];
 }
 
 export interface Permit {

@@ -62,6 +62,9 @@ async function startServer() {
   app.use("/api", contractorsRoutes);
   app.use("/api/maintenance", maintenanceRoutes);
   app.use("/api/change-management", changeManagementRoutes);
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ error: "API route not found." });
+  });
 
   // ---------- VITE / STATIC ----------
   if (process.env.NODE_ENV !== "production") {

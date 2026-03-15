@@ -85,6 +85,8 @@ export const handleRegisterCompany = (
     newCompany: CompanyApplicationForm,
     setShowRegModal: (show: boolean) => void,
     setNewCompany: (company: CompanyApplicationForm) => void,
+    editingCompanyApplicationId: number | null,
+    setEditingCompanyApplicationId: (applicationId: number | null) => void,
     actionLoading: boolean,
     setActionLoading: (loading: boolean) => void,
     token: string | null,
@@ -93,31 +95,44 @@ export const handleRegisterCompany = (
     e.preventDefault();
     setActionLoading(true);
     try {
-        const res = await fetch('/api/company-applications', {
-            method: 'POST',
+        const isResubmission = editingCompanyApplicationId !== null;
+        const res = await fetch(
+            isResubmission
+                ? `/api/company-applications/${editingCompanyApplicationId}/resubmit`
+                : '/api/company-applications',
+            {
+            method: isResubmission ? 'PATCH' : 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(newCompany),
-        });
+            }
+        );
         if (res.ok) {
             const data = await res.json();
             setShowRegModal(false);
             setNewCompany(createInitialCompanyApplicationForm());
+            setEditingCompanyApplicationId(null);
             fetchData();
             toast.success(
-                data?.applicationReference
-                    ? `Application submitted: ${data.applicationReference}`
-                    : 'Company application submitted successfully.'
+                data?.message ||
+                    (data?.applicationReference
+                        ? `${isResubmission ? 'Application resubmitted' : 'Application submitted'}: ${data.applicationReference}`
+                        : `Company application ${isResubmission ? 'resubmitted' : 'submitted'} successfully.`)
             );
         } else {
             const data = await res.json().catch(() => null);
-            toast.error(data?.error || 'Failed to submit company application.');
+            toast.error(
+                data?.error ||
+                `Failed to ${isResubmission ? 'resubmit' : 'submit'} company application.`
+            );
         }
     } catch (err) {
         console.error(err);
-        toast.error('An error occurred while submitting the company application.');
+        toast.error(
+            `An error occurred while ${editingCompanyApplicationId !== null ? 'resubmitting' : 'submitting'} the company application.`
+        );
     } finally {
         setActionLoading(false);
     }
@@ -130,8 +145,10 @@ export const handleReviewCompanyApplication = (
     fetchData: () => void
 ) => async (
     applicationId: number,
-    decision: 'Approved' | 'Rejected',
-    rejectionReason?: string
+    decision: 'Approved' | 'Rejected' | 'Returned',
+    rejectionReason?: string,
+    queryNote?: string,
+    approvedLicenseType?: string
 ) => {
     if (actionLoading) return;
 
@@ -143,7 +160,7 @@ export const handleReviewCompanyApplication = (
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
             },
-            body: JSON.stringify({ decision, rejectionReason }),
+            body: JSON.stringify({ decision, rejectionReason, queryNote, approvedLicenseType }),
         });
 
         if (res.ok) {
@@ -153,6 +170,8 @@ export const handleReviewCompanyApplication = (
                 data?.message ||
                     (decision === 'Approved'
                         ? 'Company application approved successfully.'
+                        : decision === 'Returned'
+                            ? 'Company application returned for revision successfully.'
                         : 'Company application rejected successfully.')
             );
         } else {
@@ -162,6 +181,90 @@ export const handleReviewCompanyApplication = (
     } catch (err) {
         console.error(err);
         toast.error(`An error occurred while processing the ${decision.toLowerCase()} action.`);
+    } finally {
+        setActionLoading(false);
+    }
+};
+
+export const handleConfirmCompanyApplicationPayment = (
+    actionLoading: boolean,
+    setActionLoading: (loading: boolean) => void,
+    token: string | null,
+    fetchData: () => void
+) => async (
+    applicationId: number,
+    paymentReference?: string,
+    approvedLicenseType?: string
+) => {
+    if (actionLoading) return;
+
+    setActionLoading(true);
+    try {
+        const res = await fetch(`/api/company-applications/${applicationId}/confirm-payment`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ paymentReference, approvedLicenseType }),
+        });
+
+        if (res.ok) {
+            const data = await res.json().catch(() => null);
+            fetchData();
+            toast.success(
+                data?.message ||
+                    (data?.licenseNumber
+                        ? `Licence issued successfully: ${data.licenseNumber}`
+                        : 'Payment confirmed and licence issued successfully.')
+            );
+        } else {
+            const data = await res.json().catch(() => null);
+            toast.error(data?.error || 'Failed to confirm payment and issue licence.');
+        }
+    } catch (err) {
+        console.error(err);
+        toast.error('An error occurred while confirming payment and issuing the licence.');
+    } finally {
+        setActionLoading(false);
+    }
+};
+
+export const handleSubmitCompanyApplicationPayment = (
+    actionLoading: boolean,
+    setActionLoading: (loading: boolean) => void,
+    token: string | null,
+    fetchData: () => void
+) => async (
+    applicationId: number,
+    paymentReference: string
+) => {
+    if (actionLoading) return;
+
+    setActionLoading(true);
+    try {
+        const res = await fetch(`/api/company-applications/${applicationId}/submit-payment`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ paymentReference }),
+        });
+
+        if (res.ok) {
+            const data = await res.json().catch(() => null);
+            fetchData();
+            toast.success(
+                data?.message || 'Payment submitted successfully. Admin can now confirm payment.'
+            );
+        } else {
+            const data = await res.json().catch(() => null);
+            toast.error(data?.error || 'Failed to submit payment details.');
+        }
+    } catch (err) {
+        console.error(err);
+        toast.error('An error occurred while submitting payment details.');
     } finally {
         setActionLoading(false);
     }

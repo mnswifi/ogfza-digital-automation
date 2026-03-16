@@ -4,10 +4,9 @@ import {
     Company,
     CompanyApplication,
     TradeOperationRequest,
-    Permit,
     Operation,
     Revenue,
-    ComplianceAudit,
+    ComplianceCase,
     Asset,
     Incident,
     Employee,
@@ -17,7 +16,6 @@ import {
     HRStats,
     Contractor,
     MaintenanceRecord,
-    TeamMember,
     Stats,
 } from '@/middleware/types.middleware';
 import { AppTab } from './SideBar';
@@ -27,28 +25,24 @@ import Compliance from '@/src/views/Compliance';
 import Logistics from '@/src/views/Logistics';
 import SettingsView from '@/src/views/Settings';
 import Companies from '@/src/views/Companies';
-import Permits from '@/src/views/Permits';
 import Incidents from '@/src/views/Incidents';
 import Operations from '@/src/views/Operations';
 import HR from '@/src/views/HR';
 import TradeOperations from '@/src/views/TradeOperations';
 import type { CompanyApplicationForm } from '@/src/types/appFormTypes';
 import type { TradeOperationForm } from '@/src/types/appFormTypes';
+import type { ModuleSearchTarget } from '@/src/utils/globalSearch';
 
 type HrTab = 'employees' | 'attendance' | 'certs' | 'shifts' | 'safety';
 type NewCompanyForm = CompanyApplicationForm;
 type NewTradeOperationForm = TradeOperationForm;
 
 type NewIncidentForm = {
-    company_name: string;
+    companyId: string;
+    assetId: string;
     incident_type: string;
     severity: string;
     description: string;
-};
-
-type NewPermitForm = {
-    company_id: string;
-    permit_type: string;
 };
 
 type NewEmployeeForm = {
@@ -77,23 +71,27 @@ type NewCertificationForm = {
     expiry_date: string;
 };
 
+type InviteUserForm = {
+    fullName: string;
+    email: string;
+    role: string;
+    operationalUnit: string;
+};
+
 type NewOpsForm = {
-    field_name: string;
+    assetId: string;
     production_volume: string;
     downtime_hours: string;
     report_date: string;
+    notes: string;
 };
 
 type FormActionHandler = (e?: React.FormEvent) => void | Promise<void>;
-type UpdatePermitHandler = (
-    id: number,
-    status: string,
-    expiry_date: string
-) => void | Promise<void>;
-
 type ContentRouterProps = {
     activeTab: AppTab;
     setActiveTab: (tab: AppTab) => void;
+    onRefresh: () => void | Promise<void>;
+    searchNavigation: ModuleSearchTarget | null;
 
     token: string | null;
     user: User;
@@ -103,10 +101,9 @@ type ContentRouterProps = {
     companies: Company[];
     companyApplications: CompanyApplication[];
     tradeOperations: TradeOperationRequest[];
-    permits: Permit[];
     operations: Operation[];
     revenue: Revenue[];
-    compliance: ComplianceAudit[];
+    compliance: ComplianceCase[];
     assets: Asset[];
     incidents: Incident[];
     employees: Employee[];
@@ -116,7 +113,6 @@ type ContentRouterProps = {
     hrStats: HRStats | null;
     contractors: Contractor[];
     maintenance: MaintenanceRecord[];
-    teamMembers: TeamMember[];
     allUsers: User[];
 
     actionLoading: boolean;
@@ -164,17 +160,15 @@ type ContentRouterProps = {
     newIncident: NewIncidentForm;
     setNewIncident: Dispatch<SetStateAction<NewIncidentForm>>;
     reportIncidentHandler: FormActionHandler;
-
-    showPermitModal: boolean;
-    setShowPermitModal: Dispatch<SetStateAction<boolean>>;
-    newPermit: NewPermitForm;
-    setNewPermit: Dispatch<SetStateAction<NewPermitForm>>;
-    selectedPermit: Permit | null;
-    setSelectedPermit: Dispatch<SetStateAction<Permit | null>>;
-    permitExpiry: string;
-    setPermitExpiry: Dispatch<SetStateAction<string>>;
-    applyPermitHandler: FormActionHandler;
-    updatePermitHandler: UpdatePermitHandler;
+    submitIncidentFollowUpHandler: (
+        incidentId: number,
+        followUpNote: string
+    ) => void | Promise<void>;
+    updateIncidentStatusHandler: (
+        incidentId: number,
+        status: 'Resolved' | 'Closed',
+        reviewNote?: string
+    ) => void | Promise<void>;
 
     hrTab: HrTab;
     setHrTab: Dispatch<SetStateAction<HrTab>>;
@@ -204,12 +198,14 @@ type ContentRouterProps = {
     logProductionHandler: FormActionHandler;
 
     updateUserRoleHandler: (...args: any[]) => void | Promise<void>;
-    onInviteUser: () => void;
+    onInviteUser: (inviteUser: InviteUserForm) => Promise<unknown>;
 };
 
 export default function ContentRouter({
     activeTab,
     setActiveTab,
+    onRefresh,
+    searchNavigation,
 
     token,
     user,
@@ -219,7 +215,6 @@ export default function ContentRouter({
     companies,
     companyApplications,
     tradeOperations,
-    permits,
     operations,
     revenue,
     compliance,
@@ -232,7 +227,6 @@ export default function ContentRouter({
     hrStats,
     contractors,
     maintenance,
-    teamMembers,
     allUsers,
 
     actionLoading,
@@ -262,17 +256,8 @@ export default function ContentRouter({
     newIncident,
     setNewIncident,
     reportIncidentHandler,
-
-    showPermitModal,
-    setShowPermitModal,
-    newPermit,
-    setNewPermit,
-    selectedPermit,
-    setSelectedPermit,
-    permitExpiry,
-    setPermitExpiry,
-    applyPermitHandler,
-    updatePermitHandler,
+    submitIncidentFollowUpHandler,
+    updateIncidentStatusHandler,
 
     hrTab,
     setHrTab,
@@ -308,15 +293,22 @@ export default function ContentRouter({
         case 'dashboard':
             return (
                 <Dashboard
-                    hasRole={userHasRole}
+                    userRole={user.role}
                     stats={stats}
                     hrStats={hrStats}
                     shifts={shifts}
                     attendance={attendance}
                     employees={employees}
+                    companies={companies}
+                    companyApplications={companyApplications}
+                    tradeOperations={tradeOperations}
                     compliance={compliance}
                     operations={operations}
-                    contractors={contractors}
+                    maintenance={maintenance}
+                    revenue={revenue}
+                    assets={assets}
+                    incidents={incidents}
+                    allUsers={allUsers}
                     onGoToHrAttendance={() => {
                         setActiveTab('hr');
                         setHrTab('attendance');
@@ -336,6 +328,7 @@ export default function ContentRouter({
                     user={user}
                     companies={companies}
                     companyApplications={companyApplications}
+                    searchNavigation={searchNavigation?.tab === 'companies' ? searchNavigation : null}
                     showRegModal={showRegModal}
                     setShowRegModal={setShowRegModal}
                     editingCompanyApplicationId={editingCompanyApplicationId}
@@ -357,6 +350,7 @@ export default function ContentRouter({
                     user={user}
                     companies={companies}
                     tradeOperations={tradeOperations}
+                    searchNavigation={searchNavigation?.tab === 'trade-operations' ? searchNavigation : null}
                     showTradeOperationModal={showTradeOperationModal}
                     setShowTradeOperationModal={setShowTradeOperationModal}
                     editingTradeOperationId={editingTradeOperationId}
@@ -369,44 +363,38 @@ export default function ContentRouter({
                 />
             );
 
-        case 'permits':
-            return (
-                <Permits
-                    permits={permits}
-                    companies={companies}
-                    showPermitModal={showPermitModal}
-                    setShowPermitModal={setShowPermitModal}
-                    newPermit={newPermit}
-                    setNewPermit={setNewPermit}
-                    selectedPermit={selectedPermit}
-                    setSelectedPermit={setSelectedPermit}
-                    permitExpiry={permitExpiry}
-                    setPermitExpiry={setPermitExpiry}
-                    actionLoading={actionLoading}
-                    hasRole={userHasRole}
-                    onApplyPermit={applyPermitHandler}
-                    onUpdatePermit={updatePermitHandler}
-                />
-            );
-
         case 'finance':
             return <Finance stats={stats} revenue={revenue} />;
 
         case 'compliance':
-            return <Compliance compliance={compliance} />;
+            return (
+                <Compliance
+                    token={token}
+                    user={user}
+                    companies={companies}
+                    compliance={compliance}
+                    searchNavigation={searchNavigation?.tab === 'compliance' ? searchNavigation : null}
+                    onRefresh={onRefresh}
+                />
+            );
 
         case 'operations':
             return (
                 <Operations
+                    token={token}
+                    companies={companies}
+                    incidents={incidents}
                     operations={operations}
                     assets={assets}
                     maintenance={maintenance}
+                    searchNavigation={searchNavigation?.tab === 'operations' ? searchNavigation : null}
+                    onRefresh={onRefresh}
                     showOpsModal={showOpsModal}
                     setShowOpsModal={setShowOpsModal}
                     newOps={newOps}
                     setNewOps={setNewOps}
                     actionLoading={actionLoading}
-                    hasRole={userHasRole}
+                    userRole={user.role}
                     onLogProduction={logProductionHandler}
                 />
             );
@@ -414,19 +402,25 @@ export default function ContentRouter({
         case 'incidents':
             return (
                 <Incidents
+                    token={token}
+                    user={user}
                     incidents={incidents}
                     companies={companies}
+                    assets={assets}
+                    searchNavigation={searchNavigation?.tab === 'incidents' ? searchNavigation : null}
                     showIncidentModal={showIncidentModal}
                     setShowIncidentModal={setShowIncidentModal}
                     newIncident={newIncident}
                     setNewIncident={setNewIncident}
                     actionLoading={actionLoading}
                     onReportIncident={reportIncidentHandler}
+                    onSubmitFollowUp={submitIncidentFollowUpHandler}
+                    onUpdateIncidentStatus={updateIncidentStatusHandler}
                 />
             );
 
         case 'logistics':
-            return <Logistics />;
+            return <Logistics tradeOperations={tradeOperations} />;
 
         case 'settings':
             return (
@@ -439,9 +433,9 @@ export default function ContentRouter({
                         unit: (user as any).unit ?? '',
                     }))}
                     companiesCount={companies.length}
-                    permitsCount={permits.length}
+                    tradeRequestsCount={tradeOperations.length}
                     incidentsCount={incidents.length}
-                    teamMembers={teamMembers}
+                    actionLoading={actionLoading}
                     onInviteUser={onInviteUser}
                     onUpdateUserRole={updateUserRoleHandler}
                 />

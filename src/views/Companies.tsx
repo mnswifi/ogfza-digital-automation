@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { Printer, X } from 'lucide-react';
 import {
     Company,
     CompanyApplication,
@@ -21,10 +21,21 @@ import {
     mergeCompanyApplicationDocuments,
 } from '@/src/constants/companyApplication';
 import type { CompanyApplicationForm } from '@/src/types/appFormTypes';
+import {
+    printCompanyApplicationSummary,
+    printCompanyRecord,
+    printLicenceCertificate,
+    printLicencePaymentReceipt,
+    printStructuredReport,
+} from '@/src/utils/printDocuments';
+import ModuleFilters from '@/src/components/ModuleFilters';
+import { matchesSearchQuery, type ModuleSearchTarget } from '@/src/utils/globalSearch';
 
 type NewCompanyForm = CompanyApplicationForm;
 type CompanyManagementSection = 'registered' | 'applications';
 type ApplicationStatusTone = 'emerald' | 'rose' | 'amber';
+
+const printActionButtonClassName = 'inline-flex items-center gap-2 border border-brand-line/20 px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-ink/5 transition-colors';
 
 const formatUsd = (value?: string | number | null) => {
     if (value === null || value === undefined || value === '') return '--';
@@ -345,6 +356,7 @@ type CompaniesProps = {
     user: User;
     companies: Company[];
     companyApplications: CompanyApplication[];
+    searchNavigation?: ModuleSearchTarget | null;
     showRegModal: boolean;
     setShowRegModal: (value: boolean) => void;
     editingCompanyApplicationId: number | null;
@@ -376,6 +388,7 @@ export default function Companies({
     user,
     companies,
     companyApplications,
+    searchNavigation,
     showRegModal,
     setShowRegModal,
     editingCompanyApplicationId,
@@ -409,6 +422,10 @@ export default function Companies({
     const [complianceReviewNote, setComplianceReviewNote] = useState('');
     const [adminApprovedLicenseType, setAdminApprovedLicenseType] = useState('');
     const [adminPaymentReference, setAdminPaymentReference] = useState('');
+    const [registeredSearchQuery, setRegisteredSearchQuery] = useState('');
+    const [registeredStatusFilter, setRegisteredStatusFilter] = useState('All');
+    const [applicationSearchQuery, setApplicationSearchQuery] = useState('');
+    const [applicationStatusFilter, setApplicationStatusFilter] = useState('All');
     const canRegisterCompanies = roles.includes('Contractor');
     const isContractorOnly = canRegisterCompanies && roles.length === 1;
     const canExportRegistryReport = !isContractorOnly;
@@ -418,6 +435,8 @@ export default function Companies({
     const canResubmitApplications = canRegisterCompanies && !canReviewApplications;
     const currentDocumentRequirements = getCompanyApplicationDocumentRequirements(newCompany.incorporationType);
     const requestedLicenseFeeSchedule = getLicenseFeeSchedule(newCompany.requestedLicenseType);
+    const deferredRegisteredSearchQuery = useDeferredValue(registeredSearchQuery);
+    const deferredApplicationSearchQuery = useDeferredValue(applicationSearchQuery);
 
     useEffect(() => {
         if (!selectedApplicationDetail) {
@@ -442,6 +461,19 @@ export default function Companies({
 
         setContractorPaymentReference(selectedApplicationStatusDetail.payment_reference || '');
     }, [selectedApplicationStatusDetail]);
+
+    useEffect(() => {
+        if (!searchNavigation) return;
+
+        if (searchNavigation.section === 'applications') {
+            setActiveSection('applications');
+            setApplicationSearchQuery(searchNavigation.query || '');
+            return;
+        }
+
+        setActiveSection('registered');
+        setRegisteredSearchQuery(searchNavigation.query || '');
+    }, [searchNavigation]);
     const updateCompanyField = <K extends keyof NewCompanyForm>(field: K, value: NewCompanyForm[K]) => {
         if (field === 'incorporationType') {
             const nextIncorporationType = String(value);
@@ -514,6 +546,64 @@ export default function Companies({
 
         return 'bg-amber-50 text-amber-700';
     };
+    const registeredStatusOptions = useMemo(
+        () => ['All', ...Array.from(new Set(companies.map((company) => company.status).filter(Boolean))).sort()],
+        [companies],
+    );
+    const applicationStatusOptions = useMemo(
+        () => [
+            'All',
+            ...Array.from(
+                new Set(
+                    companyApplications.map((application) => getApplicationStatusLabel(application)).filter(Boolean),
+                ),
+            ).sort(),
+        ],
+        [companyApplications],
+    );
+    const filteredCompanies = useMemo(
+        () =>
+            companies.filter((company) => {
+                const matchesQuery = matchesSearchQuery(
+                    deferredRegisteredSearchQuery,
+                    company.name,
+                    company.license_no,
+                    company.license_type,
+                    company.incorporation_type,
+                    company.free_zone_location,
+                    company.representative_email,
+                    company.status,
+                );
+                const matchesStatus =
+                    registeredStatusFilter === 'All' || company.status === registeredStatusFilter;
+
+                return matchesQuery && matchesStatus;
+            }),
+        [companies, deferredRegisteredSearchQuery, registeredStatusFilter],
+    );
+    const filteredCompanyApplications = useMemo(
+        () =>
+            companyApplications.filter((application) => {
+                const displayStatus = getApplicationStatusLabel(application);
+                const matchesQuery = matchesSearchQuery(
+                    deferredApplicationSearchQuery,
+                    application.application_reference,
+                    application.company_name,
+                    application.submitted_by_name,
+                    application.primary_contact_name,
+                    application.primary_contact_email,
+                    application.free_zone_location,
+                    application.requested_license_type,
+                    application.approved_license_type,
+                    displayStatus,
+                );
+                const matchesStatus =
+                    applicationStatusFilter === 'All' || displayStatus === applicationStatusFilter;
+
+                return matchesQuery && matchesStatus;
+            }),
+        [companyApplications, deferredApplicationSearchQuery, applicationStatusFilter],
+    );
     const closeApplicationStatusModal = () => {
         setShowApplicationStatusModal(false);
         setSelectedApplication(null);
@@ -733,6 +823,45 @@ export default function Companies({
         } finally {
             setCompanyDetailLoading(false);
         }
+    };
+    const handlePrintRegistryReport = () => {
+        printStructuredReport({
+            documentTitle: 'OGFZA Registered Company Registry',
+            kicker: 'OGFZA Company Registry',
+            title: 'Registered Companies Report',
+            subtitle: 'Approved and licensed entities currently visible in the Company Management registry.',
+            reference: `Generated ${formatDisplayDateTime(new Date().toISOString())}`,
+            badges: [
+                { label: `${filteredCompanies.length} companies`, tone: 'neutral' },
+            ],
+            sections: [
+                {
+                    title: 'Registry Summary',
+                    kind: 'fields',
+                    columns: 3,
+                    fields: [
+                        { label: 'Visible Companies', value: filteredCompanies.length },
+                        { label: 'Active Companies', value: filteredCompanies.filter((company) => company.status === 'Active').length },
+                        { label: 'Suspended / Inactive', value: filteredCompanies.filter((company) => company.status === 'Suspended' || company.status === 'Inactive').length },
+                    ],
+                },
+                {
+                    title: 'Registered Companies',
+                    kind: 'table',
+                    headers: ['Company Name', 'Licence No.', 'Licence Type', 'Incorporation', 'Free Zone', 'Status', 'Approved Date'],
+                    rows: filteredCompanies.map((company) => ([
+                        company.name,
+                        company.license_no || '--',
+                        company.license_type || '--',
+                        company.incorporation_type || '--',
+                        company.free_zone_location || '--',
+                        company.status,
+                        formatDisplayDate(company.approved_date),
+                    ])),
+                },
+            ],
+            footerNote: 'Generated from the Company Management registry currently available to this user in the OGFZA Digital Automation prototype.',
+        });
     };
 
     return (
@@ -1387,9 +1516,63 @@ export default function Companies({
                                     </span>
                                 </div>
                             </div>
-                            <button type="button" onClick={closeCompanyDetailModal}>
-                                <X size={20} />
-                            </button>
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                {selectedCompanyDetail && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => printCompanyRecord(selectedCompanyDetail)}
+                                            className={printActionButtonClassName}
+                                        >
+                                            <Printer size={14} />
+                                            Print Company Record
+                                        </button>
+                                        {selectedCompanyDetail.license_no && (
+                                            <button
+                                                type="button"
+                                                onClick={() => printLicenceCertificate({
+                                                    companyName: selectedCompanyDetail.name,
+                                                    licenseNo: selectedCompanyDetail.license_no,
+                                                    licenseType: selectedCompanyDetail.license_type || selectedCompanyDetail.approved_license_type,
+                                                    freeZoneLocation: selectedCompanyDetail.free_zone_location,
+                                                    issuedOn: selectedCompanyDetail.approved_date || selectedCompanyDetail.application_approved_at,
+                                                    approvedBy: selectedCompanyDetail.approved_by_name,
+                                                    applicationReference: selectedCompanyDetail.application_reference,
+                                                })}
+                                                className={printActionButtonClassName}
+                                            >
+                                                <Printer size={14} />
+                                                Print Licence
+                                            </button>
+                                        )}
+                                        {selectedCompanyDetail.payment_status === 'Paid' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => printLicencePaymentReceipt({
+                                                    companyName: selectedCompanyDetail.name,
+                                                    applicationReference: selectedCompanyDetail.application_reference,
+                                                    licenseNo: selectedCompanyDetail.license_no,
+                                                    licenseType: selectedCompanyDetail.license_type || selectedCompanyDetail.approved_license_type,
+                                                    amountPaid: selectedCompanyDetail.approved_fee_usd,
+                                                    paymentReference: selectedCompanyDetail.payment_reference,
+                                                    paymentStatus: selectedCompanyDetail.payment_status,
+                                                    paymentSubmittedOn: selectedCompanyDetail.payment_submitted_at,
+                                                    paymentSubmittedBy: selectedCompanyDetail.payment_submitted_by_name,
+                                                    paymentConfirmedOn: selectedCompanyDetail.payment_confirmed_at,
+                                                    paymentConfirmedBy: selectedCompanyDetail.payment_confirmed_by_name,
+                                                })}
+                                                className={printActionButtonClassName}
+                                            >
+                                                <Printer size={14} />
+                                                Print Receipt
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                                <button type="button" onClick={closeCompanyDetailModal}>
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         {companyDetailLoading && (
@@ -1668,9 +1851,63 @@ export default function Companies({
                                         {selectedApplication.application_reference}
                                     </p>
                                 </div>
-                                <button type="button" onClick={closeApplicationStatusModal}>
-                                    <X size={20} />
-                                </button>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    {selectedApplicationStatusDetail && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => printCompanyApplicationSummary(selectedApplicationStatusDetail)}
+                                                className={printActionButtonClassName}
+                                            >
+                                                <Printer size={14} />
+                                                Print Application Summary
+                                            </button>
+                                            {selectedApplicationStatusDetail.linked_company_license_no && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => printLicenceCertificate({
+                                                        companyName: selectedApplicationStatusDetail.company_name,
+                                                        licenseNo: selectedApplicationStatusDetail.linked_company_license_no,
+                                                        licenseType: selectedApplicationStatusDetail.approved_license_type || selectedApplicationStatusDetail.requested_license_type,
+                                                        freeZoneLocation: selectedApplicationStatusDetail.free_zone_location,
+                                                        issuedOn: selectedApplicationStatusDetail.payment_confirmed_at || selectedApplicationStatusDetail.approved_at,
+                                                        approvedBy: selectedApplicationStatusDetail.approved_by_name,
+                                                        applicationReference: selectedApplicationStatusDetail.application_reference,
+                                                    })}
+                                                    className={printActionButtonClassName}
+                                                >
+                                                    <Printer size={14} />
+                                                    Print Licence
+                                                </button>
+                                            )}
+                                            {selectedApplicationStatusDetail.payment_status === 'Paid' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => printLicencePaymentReceipt({
+                                                        companyName: selectedApplicationStatusDetail.company_name,
+                                                        applicationReference: selectedApplicationStatusDetail.application_reference,
+                                                        licenseNo: selectedApplicationStatusDetail.linked_company_license_no,
+                                                        licenseType: selectedApplicationStatusDetail.approved_license_type || selectedApplicationStatusDetail.requested_license_type,
+                                                        amountPaid: selectedApplicationStatusDetail.approved_fee_usd || selectedApplicationStatusDetail.estimated_fee_usd,
+                                                        paymentReference: selectedApplicationStatusDetail.payment_reference,
+                                                        paymentStatus: selectedApplicationStatusDetail.payment_status,
+                                                        paymentSubmittedOn: selectedApplicationStatusDetail.payment_submitted_at,
+                                                        paymentSubmittedBy: selectedApplicationStatusDetail.payment_submitted_by_name,
+                                                        paymentConfirmedOn: selectedApplicationStatusDetail.payment_confirmed_at,
+                                                        paymentConfirmedBy: selectedApplicationStatusDetail.payment_confirmed_by_name,
+                                                    })}
+                                                    className={printActionButtonClassName}
+                                                >
+                                                    <Printer size={14} />
+                                                    Print Receipt
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                    <button type="button" onClick={closeApplicationStatusModal}>
+                                        <X size={20} />
+                                    </button>
+                                </div>
                             </div>
 
                             {applicationStatusLoading && (
@@ -1865,9 +2102,63 @@ export default function Companies({
                                     )}
                                 </div>
                             </div>
-                            <button type="button" onClick={closeApplicationReviewModal}>
-                                <X size={20} />
-                            </button>
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                {selectedApplicationDetail && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => printCompanyApplicationSummary(selectedApplicationDetail)}
+                                            className={printActionButtonClassName}
+                                        >
+                                            <Printer size={14} />
+                                            Print Application Summary
+                                        </button>
+                                        {selectedApplicationDetail.linked_company_license_no && (
+                                            <button
+                                                type="button"
+                                                onClick={() => printLicenceCertificate({
+                                                    companyName: selectedApplicationDetail.company_name,
+                                                    licenseNo: selectedApplicationDetail.linked_company_license_no,
+                                                    licenseType: selectedApplicationDetail.approved_license_type || selectedApplicationDetail.requested_license_type,
+                                                    freeZoneLocation: selectedApplicationDetail.free_zone_location,
+                                                    issuedOn: selectedApplicationDetail.payment_confirmed_at || selectedApplicationDetail.approved_at,
+                                                    approvedBy: selectedApplicationDetail.approved_by_name,
+                                                    applicationReference: selectedApplicationDetail.application_reference,
+                                                })}
+                                                className={printActionButtonClassName}
+                                            >
+                                                <Printer size={14} />
+                                                Print Licence
+                                            </button>
+                                        )}
+                                        {selectedApplicationDetail.payment_status === 'Paid' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => printLicencePaymentReceipt({
+                                                    companyName: selectedApplicationDetail.company_name,
+                                                    applicationReference: selectedApplicationDetail.application_reference,
+                                                    licenseNo: selectedApplicationDetail.linked_company_license_no,
+                                                    licenseType: selectedApplicationDetail.approved_license_type || selectedApplicationDetail.requested_license_type,
+                                                    amountPaid: selectedApplicationDetail.approved_fee_usd || selectedApplicationDetail.estimated_fee_usd,
+                                                    paymentReference: selectedApplicationDetail.payment_reference,
+                                                    paymentStatus: selectedApplicationDetail.payment_status,
+                                                    paymentSubmittedOn: selectedApplicationDetail.payment_submitted_at,
+                                                    paymentSubmittedBy: selectedApplicationDetail.payment_submitted_by_name,
+                                                    paymentConfirmedOn: selectedApplicationDetail.payment_confirmed_at,
+                                                    paymentConfirmedBy: selectedApplicationDetail.payment_confirmed_by_name,
+                                                })}
+                                                className={printActionButtonClassName}
+                                            >
+                                                <Printer size={14} />
+                                                Print Receipt
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                                <button type="button" onClick={closeApplicationReviewModal}>
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         {applicationDetailLoading && (
@@ -2318,7 +2609,7 @@ export default function Companies({
 
             {activeSection === 'registered' && (
                 <>
-                    <div className="p-6 border-b border-brand-line/10 flex justify-between items-center">
+                    <div className="p-6 border-b border-brand-line/10 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
 
                             <p className="text-xs opacity-50 uppercase tracking-widest mt-1">
@@ -2326,10 +2617,10 @@ export default function Companies({
                             </p>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             {canExportRegistryReport && (
                                 <button
-                                    onClick={() => window.print()}
+                                    onClick={handlePrintRegistryReport}
                                     className="border border-brand-line/20 px-4 py-2 text-[10px] uppercase tracking-widest font-bold hover:bg-brand-ink/5 transition-colors"
                                 >
                                     Export Registry Report
@@ -2346,64 +2637,84 @@ export default function Companies({
                         </div>
                     </div>
 
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="bg-brand-ink/5">
-                                <th className="p-4 col-header">Company Name</th>
-                                <th className="p-4 col-header">License No.</th>
-                                <th className="p-4 col-header">License Type</th>
-                                <th className="p-4 col-header">Incorporation</th>
-                                <th className="p-4 col-header">Free Zone</th>
-                                <th className="p-4 col-header">Representative</th>
-                                <th className="p-4 col-header">Status</th>
-                                <th className="p-4 col-header">Approved</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {companies.map((c) => (
-                                <tr
-                                    key={c.id}
-                                    className="data-row cursor-pointer hover:bg-brand-ink/5 focus:outline-none focus:bg-brand-ink/5"
-                                    onClick={() => void handleOpenCompanyDetail(c)}
-                                    onKeyDown={(event) => {
-                                        if (event.key === 'Enter' || event.key === ' ') {
-                                            event.preventDefault();
-                                            void handleOpenCompanyDetail(c);
-                                        }
-                                    }}
-                                    tabIndex={0}
-                                    role="button"
-                                    aria-label={`View details for ${c.name}`}
-                                >
-                                    <td className="p-4 text-sm font-bold">{c.name}</td>
-                                    <td className="p-4 data-value text-sm">{c.license_no || '--'}</td>
-                                    <td className="p-4 text-xs opacity-80">{c.license_type || '--'}</td>
-                                    <td className="p-4 text-xs opacity-80">{c.incorporation_type || '--'}</td>
-                                    <td className="p-4 text-xs opacity-60">{c.free_zone_location || '--'}</td>
-                                    <td className="p-4 text-xs opacity-70">{c.representative_email || '--'}</td>
-                                    <td className="p-4">
-                                        <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">
-                                            {c.status}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 data-value text-xs opacity-60">{formatDisplayDate(c.approved_date)}</td>
+                    <ModuleFilters
+                        searchValue={registeredSearchQuery}
+                        onSearchChange={setRegisteredSearchQuery}
+                        searchPlaceholder="Search by company, licence number, licence type, free zone, or representative email"
+                        selects={[
+                            {
+                                label: 'Status',
+                                value: registeredStatusFilter,
+                                options: registeredStatusOptions.map((option) => ({ label: option, value: option })),
+                                onChange: setRegisteredStatusFilter,
+                            },
+                        ]}
+                        resultCount={filteredCompanies.length}
+                        resultLabel="matching companies"
+                    />
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[980px] text-left">
+                            <thead>
+                                <tr className="bg-brand-ink/5">
+                                    <th className="p-4 col-header">Company Name</th>
+                                    <th className="p-4 col-header">License No.</th>
+                                    <th className="p-4 col-header">License Type</th>
+                                    <th className="p-4 col-header">Incorporation</th>
+                                    <th className="p-4 col-header">Free Zone</th>
+                                    <th className="p-4 col-header">Representative</th>
+                                    <th className="p-4 col-header">Status</th>
+                                    <th className="p-4 col-header">Approved</th>
                                 </tr>
-                            ))}
-                            {companies.length === 0 && (
-                                <tr>
-                                    <td colSpan={8} className="p-8 text-center  opacity-40">
-                                        No approved companies available yet.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {filteredCompanies.map((c) => (
+                                    <tr
+                                        key={c.id}
+                                        className="data-row cursor-pointer hover:bg-brand-ink/5 focus:outline-none focus:bg-brand-ink/5"
+                                        onClick={() => void handleOpenCompanyDetail(c)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                void handleOpenCompanyDetail(c);
+                                            }
+                                        }}
+                                        tabIndex={0}
+                                        role="button"
+                                        aria-label={`View details for ${c.name}`}
+                                    >
+                                        <td className="p-4 text-sm font-bold">{c.name}</td>
+                                        <td className="p-4 data-value text-sm">{c.license_no || '--'}</td>
+                                        <td className="p-4 text-xs opacity-80">{c.license_type || '--'}</td>
+                                        <td className="p-4 text-xs opacity-80">{c.incorporation_type || '--'}</td>
+                                        <td className="p-4 text-xs opacity-60">{c.free_zone_location || '--'}</td>
+                                        <td className="p-4 text-xs opacity-70">{c.representative_email || '--'}</td>
+                                        <td className="p-4">
+                                            <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">
+                                                {c.status}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 data-value text-xs opacity-60">{formatDisplayDate(c.approved_date)}</td>
+                                    </tr>
+                                ))}
+                                {filteredCompanies.length === 0 && (
+                                    <tr>
+                                        <td colSpan={8} className="p-8 text-center  opacity-40">
+                                            {companies.length === 0
+                                                ? 'No approved companies available yet.'
+                                                : 'No companies match the current filters.'}
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </>
             )}
 
             {activeSection === 'applications' && (
                 <>
-                    <div className="p-6 border-b border-brand-line/10 flex justify-between items-center">
+                    <div className="p-6 border-b border-brand-line/10 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
 
                             <p className="text-xs opacity-50 uppercase tracking-widest mt-1">
@@ -2414,25 +2725,42 @@ export default function Companies({
                         </div>
 
                         <span className="text-[10px] uppercase tracking-widest font-bold opacity-30">
-                            {companyApplications.length} Total
+                            {filteredCompanyApplications.length} Showing
                         </span>
                     </div>
 
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="bg-brand-ink/5">
-                                <th className="p-4 col-header">Reference</th>
-                                <th className="p-4 col-header">Company</th>
-                                {canReviewApplications && <th className="p-4 col-header">Submitted By</th>}
-                                <th className="p-4 col-header">Contact Email</th>
-                                <th className="p-4 col-header">Submitted</th>
-                                <th className="p-4 col-header">Status</th>
-                                <th className="p-4 col-header">Last Action</th>
-                                {canReviewApplications && <th className="p-4 col-header">Actions</th>}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {companyApplications.map((application) => {
+                    <ModuleFilters
+                        searchValue={applicationSearchQuery}
+                        onSearchChange={setApplicationSearchQuery}
+                        searchPlaceholder="Search by company, reference, contact email, submitter, or licence type"
+                        selects={[
+                            {
+                                label: 'Status',
+                                value: applicationStatusFilter,
+                                options: applicationStatusOptions.map((option) => ({ label: option, value: option })),
+                                onChange: setApplicationStatusFilter,
+                            },
+                        ]}
+                        resultCount={filteredCompanyApplications.length}
+                        resultLabel="matching applications"
+                    />
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[980px] text-left">
+                            <thead>
+                                <tr className="bg-brand-ink/5">
+                                    <th className="p-4 col-header">Reference</th>
+                                    <th className="p-4 col-header">Company</th>
+                                    {canReviewApplications && <th className="p-4 col-header">Submitted By</th>}
+                                    <th className="p-4 col-header">Contact Email</th>
+                                    <th className="p-4 col-header">Submitted</th>
+                                    <th className="p-4 col-header">Status</th>
+                                    <th className="p-4 col-header">Last Action</th>
+                                    {canReviewApplications && <th className="p-4 col-header">Actions</th>}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredCompanyApplications.map((application) => {
                                 const displayStatus = getApplicationStatusLabel(application);
                                 const displayStatusClasses = getApplicationStatusClasses(
                                     getApplicationStatusTone(displayStatus)
@@ -2449,88 +2777,91 @@ export default function Companies({
                                     );
                                 const lastActionDate = getLastActionDate(application);
 
-                                return (
-                                    <tr
-                                        key={application.id}
-                                        className="data-row cursor-pointer hover:bg-brand-ink/5 focus:outline-none focus:bg-brand-ink/5"
-                                        onClick={() => openApplicationStatusModal(application)}
-                                        onKeyDown={(event) => {
-                                            if (event.key === 'Enter' || event.key === ' ') {
-                                                event.preventDefault();
-                                                openApplicationStatusModal(application);
-                                            }
-                                        }}
-                                        tabIndex={0}
-                                        role="button"
-                                        aria-label={`View status for ${application.company_name}`}
-                                    >
-                                        <td className="p-4 text-xs font-mono">{application.application_reference}</td>
-                                        <td className="p-4 text-sm font-bold">{application.company_name}</td>
-                                        {canReviewApplications && (
-                                            <td className="p-4 text-xs opacity-70">{application.submitted_by_name || '--'}</td>
-                                        )}
-                                        <td className="p-4 text-xs opacity-70">{application.primary_contact_email || '--'}</td>
-                                        <td className="p-4 data-value text-xs opacity-60">
-                                            {formatDisplayDate(application.submitted_at)}
-                                        </td>
-                                        <td className="p-4">
-                                            <span
-                                                className={`text-[10px] font-mono font-bold px-2 py-1 rounded-full ${displayStatusClasses}`}
-                                            >
-                                                {displayStatus}
-                                            </span>
-
-                                        </td>
-                                        <td className="p-4 data-value text-xs opacity-60">
-                                            {formatDisplayDate(lastActionDate)}
-                                        </td>
-                                        {canReviewApplications && (
-                                            <td className="p-4">
-                                                {canActOnApplication ? (
-                                                    isComplianceReviewer ? (
-                                                        <button
-                                                            type="button"
-                                                            disabled={actionLoading}
-                                                            onClick={(event) => {
-                                                                event.stopPropagation();
-                                                                void handleOpenApplicationReview(application);
-                                                            }}
-                                                            className="bg-brand-ink text-brand-bg px-3 py-2 text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
-                                                        >
-                                                            Review
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            type="button"
-                                                            disabled={actionLoading}
-                                                            onClick={(event) => {
-                                                                event.stopPropagation();
-                                                                void handleOpenApplicationReview(application);
-                                                            }}
-                                                            className="bg-brand-ink text-brand-bg px-3 py-2 text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
-                                                        >
-                                                            {application.status === 'Payment Submitted' ? 'Confirm Payment' : 'Review'}
-                                                        </button>
-                                                    )
-                                                ) : (
-                                                    <span className="text-[10px] uppercase tracking-widest opacity-30">
-                                                        No action
-                                                    </span>
-                                                )}
+                                    return (
+                                        <tr
+                                            key={application.id}
+                                            className="data-row cursor-pointer hover:bg-brand-ink/5 focus:outline-none focus:bg-brand-ink/5"
+                                            onClick={() => openApplicationStatusModal(application)}
+                                            onKeyDown={(event) => {
+                                                if (event.key === 'Enter' || event.key === ' ') {
+                                                    event.preventDefault();
+                                                    openApplicationStatusModal(application);
+                                                }
+                                            }}
+                                            tabIndex={0}
+                                            role="button"
+                                            aria-label={`View status for ${application.company_name}`}
+                                        >
+                                            <td className="p-4 text-xs font-mono">{application.application_reference}</td>
+                                            <td className="p-4 text-sm font-bold">{application.company_name}</td>
+                                            {canReviewApplications && (
+                                                <td className="p-4 text-xs opacity-70">{application.submitted_by_name || '--'}</td>
+                                            )}
+                                            <td className="p-4 text-xs opacity-70">{application.primary_contact_email || '--'}</td>
+                                            <td className="p-4 data-value text-xs opacity-60">
+                                                {formatDisplayDate(application.submitted_at)}
                                             </td>
-                                        )}
+                                            <td className="p-4">
+                                                <span
+                                                    className={`text-[10px] font-mono font-bold px-2 py-1 rounded-full ${displayStatusClasses}`}
+                                                >
+                                                    {displayStatus}
+                                                </span>
+
+                                            </td>
+                                            <td className="p-4 data-value text-xs opacity-60">
+                                                {formatDisplayDate(lastActionDate)}
+                                            </td>
+                                            {canReviewApplications && (
+                                                <td className="p-4">
+                                                    {canActOnApplication ? (
+                                                        isComplianceReviewer ? (
+                                                            <button
+                                                                type="button"
+                                                                disabled={actionLoading}
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    void handleOpenApplicationReview(application);
+                                                                }}
+                                                                className="bg-brand-ink text-brand-bg px-3 py-2 text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
+                                                            >
+                                                                Review
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                disabled={actionLoading}
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    void handleOpenApplicationReview(application);
+                                                                }}
+                                                                className="bg-brand-ink text-brand-bg px-3 py-2 text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
+                                                            >
+                                                                {application.status === 'Payment Submitted' ? 'Confirm Payment' : 'Review'}
+                                                            </button>
+                                                        )
+                                                    ) : (
+                                                        <span className="text-[10px] uppercase tracking-widest opacity-30">
+                                                            No action
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            )}
+                                        </tr>
+                                    );
+                                })}
+                                {filteredCompanyApplications.length === 0 && (
+                                    <tr>
+                                        <td colSpan={canReviewApplications ? 9 : 7} className="p-8 text-center  opacity-40">
+                                            {companyApplications.length === 0
+                                                ? 'No company applications available yet.'
+                                                : 'No applications match the current filters.'}
+                                        </td>
                                     </tr>
-                                );
-                            })}
-                            {companyApplications.length === 0 && (
-                                <tr>
-                                    <td colSpan={canReviewApplications ? 9 : 7} className="p-8 text-center  opacity-40">
-                                        No company applications available yet.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </>
             )}
         </div>

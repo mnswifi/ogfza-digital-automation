@@ -1,5 +1,4 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { Permit } from '@/middleware/types.middleware';
 import {
     createInitialAttendanceForm,
     createInitialCertificationForm,
@@ -7,14 +6,12 @@ import {
     createInitialEmployeeForm,
     createInitialIncidentForm,
     createInitialOpsForm,
-    createInitialPermitForm,
     createInitialTradeOperationForm,
 } from '../hooks/appInitialState';
 
 export type CompanyApplicationForm = ReturnType<typeof createInitialCompanyApplicationForm>;
 export type TradeOperationForm = ReturnType<typeof createInitialTradeOperationForm>;
 export type IncidentForm = ReturnType<typeof createInitialIncidentForm>;
-export type PermitForm = ReturnType<typeof createInitialPermitForm>;
 export type EmployeeForm = ReturnType<typeof createInitialEmployeeForm>;
 export type AttendanceForm = ReturnType<typeof createInitialAttendanceForm>;
 export type CertificationForm = ReturnType<typeof createInitialCertificationForm>;
@@ -29,5 +26,4 @@ export type SharedFormHookParams = {
     setActionLoading: Dispatch<SetStateAction<boolean>>;
 };
 
-export type PermitSelectionSetter = Dispatch<SetStateAction<Permit | null>>;
 export type StringSetter = Dispatch<SetStateAction<string>>;

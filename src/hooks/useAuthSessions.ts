@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction, React } from 'react';
-import type { Permit, User } from '@/middleware/types.middleware';
+import type { User } from '@/middleware/types.middleware';
 import toast from 'react-hot-toast';
 import {
     createInitialCompanyApplicationForm,
@@ -382,64 +382,6 @@ export const handleSubmitCompanyApplicationPayment = (
     }
 };
 
-export const handleApplyPermit = (
-    newPermit: { company_id: string; permit_type: string },
-    setShowPermitModal: (show: boolean) => void,
-    setNewPermit: (permit: { company_id: string; permit_type: string }) => void,
-    actionLoading: boolean,
-    setActionLoading: (loading: boolean) => void,
-    token: string | null,
-    fetchData: () => void
-) => async (e: React.FormEvent) => {
-    e.preventDefault();
-    setActionLoading(true);
-    try {
-        const res = await fetch('/api/permits', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(newPermit),
-        });
-        if (res.ok) {
-            setShowPermitModal(false);
-            setNewPermit({ company_id: '', permit_type: '' });
-            fetchData();
-            toast.success('Permit application submitted. Regulatory team has been notified.');
-        }
-    } catch (err) {
-        console.error(err);
-    } finally {
-        setActionLoading(false);
-    }
-};
-
-export const handleUpdatePermit = (
-    setSelectedPermit: (permit: Permit | null) => void,
-    setPermitExpiry: (expiry: string) => void,
-    actionLoading: boolean,
-    setActionLoading: (loading: boolean) => void,
-    token: string | null,
-    fetchData: () => void
-) => async (id: number, status: string, expiry_date: string) => {
-    setActionLoading(true);
-    try {
-        const res = await fetch(`/api/permits/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ status, expiry_date }),
-        });
-        if (res.ok) {
-            setSelectedPermit(null);
-            setPermitExpiry('');
-            fetchData();
-            toast.success(`Permit status updated to ${status}.`);
-        }
-    } catch (err) {
-        console.error(err);
-    } finally {
-        setActionLoading(false);
-    }
-};
-
 export const handleUpdateUserRole = (
     token: string | null,
     fetchData: () => void
@@ -463,10 +405,54 @@ export const handleUpdateUserRole = (
     }
 };
 
+export const handleInviteUser = (
+    token: string | null,
+    fetchData: () => void
+) => async (inviteUser: {
+    fullName: string;
+    email: string;
+    role: string;
+    operationalUnit: string;
+}) => {
+    try {
+        const res = await fetch('/api/users/invite', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(inviteUser),
+        });
+
+        const data = await res.json().catch(() => null);
+
+        if (res.ok) {
+            fetchData();
+            toast.success(data?.message || 'User invited successfully.');
+
+            if (data?.emailDelivered === false && data?.temporaryPassword) {
+                toast(
+                    `Temporary password for manual sharing: ${data.temporaryPassword}`,
+                    { duration: 8000 }
+                );
+            }
+
+            return data;
+        }
+
+        toast.error(data?.error || 'Failed to invite user.');
+        return null;
+    } catch (err) {
+        console.error(err);
+        toast.error('An error occurred while inviting the user.');
+        return null;
+    }
+};
+
 export const handleReportIncident = (
-    newIncident: { company_name: string; incident_type: string; severity: string; description: string },
+    newIncident: { companyId: string; assetId: string; incident_type: string; severity: string; description: string },
     setShowIncidentModal: (show: boolean) => void,
-    setNewIncident: (incident: { company_name: string; incident_type: string; severity: string; description: string }) => void,
+    setNewIncident: (incident: { companyId: string; assetId: string; incident_type: string; severity: string; description: string }) => void,
     actionLoading: boolean,
     setActionLoading: (loading: boolean) => void,
     token: string | null,
@@ -482,11 +468,90 @@ export const handleReportIncident = (
         });
         if (res.ok) {
             setShowIncidentModal(false);
-            setNewIncident({ company_name: '', incident_type: 'HSE', severity: 'Medium', description: '' });
+            setNewIncident({ companyId: '', assetId: '', incident_type: 'HSE', severity: 'Medium', description: '' });
             fetchData();
         }
     } catch (err) {
         console.error(err);
+    } finally {
+        setActionLoading(false);
+    }
+};
+
+export const handleSubmitIncidentFollowUp = (
+    actionLoading: boolean,
+    setActionLoading: (loading: boolean) => void,
+    token: string | null,
+    fetchData: () => void
+) => async (
+    incidentId: number,
+    followUpNote: string
+) => {
+    if (actionLoading) return;
+
+    setActionLoading(true);
+    try {
+        const res = await fetch(`/api/incidents/${incidentId}/follow-up`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ followUpNote }),
+        });
+
+        if (res.ok) {
+            fetchData();
+            toast.success('Incident follow-up submitted successfully.');
+        } else {
+            const data = await res.json().catch(() => null);
+            toast.error(data?.error || 'Failed to submit the incident follow-up.');
+        }
+    } catch (err) {
+        console.error(err);
+        toast.error('An error occurred while submitting the incident follow-up.');
+    } finally {
+        setActionLoading(false);
+    }
+};
+
+export const handleUpdateIncidentStatus = (
+    actionLoading: boolean,
+    setActionLoading: (loading: boolean) => void,
+    token: string | null,
+    fetchData: () => void
+) => async (
+    incidentId: number,
+    status: 'Resolved' | 'Closed',
+    reviewNote?: string
+) => {
+    if (actionLoading) return;
+
+    setActionLoading(true);
+    try {
+        const res = await fetch(`/api/incidents/${incidentId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ status, reviewNote }),
+        });
+
+        if (res.ok) {
+            fetchData();
+            toast.success(
+                status === 'Resolved'
+                    ? 'Incident resolved successfully.'
+                    : 'Incident closed successfully.'
+            );
+        } else {
+            const data = await res.json().catch(() => null);
+            toast.error(data?.error || `Failed to mark the incident as ${status.toLowerCase()}.`);
+        }
+    } catch (err) {
+        console.error(err);
+        toast.error(`An error occurred while marking the incident as ${status.toLowerCase()}.`);
     } finally {
         setActionLoading(false);
     }
@@ -644,9 +709,9 @@ export const handleRequestProject = (
 };
 
 export const handleLogProduction = (
-    newOps: { field_name: string; production_volume: string; downtime_hours: string; report_date: string },
+    newOps: { assetId: string; production_volume: string; downtime_hours: string; report_date: string; notes: string },
     setShowOpsModal: (show: boolean) => void,
-    setNewOps: (ops: { field_name: string; production_volume: string; downtime_hours: string; report_date: string }) => void,
+    setNewOps: (ops: { assetId: string; production_volume: string; downtime_hours: string; report_date: string; notes: string }) => void,
     actionLoading: boolean,
     setActionLoading: (loading: boolean) => void,
     token: string | null,
@@ -660,13 +725,14 @@ export const handleLogProduction = (
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({
                 ...newOps,
+                assetId: Number(newOps.assetId),
                 production_volume: Number(newOps.production_volume),
-                downtime_hours: Number(newOps.downtime_hours)
+                downtime_hours: Number(newOps.downtime_hours),
             }),
         });
         if (res.ok) {
             setShowOpsModal(false);
-            setNewOps({ field_name: '', production_volume: '', downtime_hours: '', report_date: '' });
+            setNewOps({ assetId: '', production_volume: '', downtime_hours: '', report_date: '', notes: '' });
             fetchData();
             toast.success('Production report logged successfully.');
         }

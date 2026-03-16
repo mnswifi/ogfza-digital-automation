@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster } from 'react-hot-toast';
 import { User } from '@/middleware/types.middleware';
@@ -14,6 +14,12 @@ import { useAppData } from './hooks/useAppData';
 import { useAppForms } from './hooks/useAppForms';
 import { useNotifications } from './hooks/useNotifications';
 import { hasRole } from './hooks/appAccess';
+import {
+  buildGlobalSearchResults,
+  type GlobalSearchResult,
+  type ModuleSearchTarget,
+} from './utils/globalSearch';
+import { buildActionCenterItems } from './utils/actionCenter';
 
 type AuthView = 'login' | 'signup' | 'forgot';
 
@@ -22,21 +28,49 @@ export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('petroflow_token'));
   const [authView, setAuthView] = useState<AuthView>('login');
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [searchNavigation, setSearchNavigation] = useState<ModuleSearchTarget | null>(null);
+  const deferredGlobalSearchQuery = useDeferredValue(globalSearchQuery);
 
   const handleLogin = useCallback((nextUser: User, nextToken: string) => {
     loginUser(nextUser, nextToken, setUser, setToken, setActiveTab);
+    setMobileNavOpen(false);
   }, []);
 
   const handleLogout = useCallback(() => {
     logoutUser(setUser, setToken, setAuthView);
+    setMobileNavOpen(false);
   }, []);
+
+  const handleTabChange = useCallback((tab: AppTab) => {
+    setActiveTab(tab);
+    setMobileNavOpen(false);
+  }, []);
+
+  const navigateToTarget = useCallback((target: ModuleSearchTarget) => {
+    setActiveTab(target.tab);
+    setMobileNavOpen(false);
+    setSearchNavigation({
+      key: Date.now() + Math.floor(Math.random() * 1000),
+      ...target,
+    });
+    setGlobalSearchQuery('');
+  }, []);
+
+  const handleSelectGlobalSearchResult = useCallback((result: GlobalSearchResult) => {
+    navigateToTarget({
+      tab: result.tab,
+      section: result.section,
+      query: result.query,
+    });
+  }, [navigateToTarget]);
 
   const {
     stats,
     companies,
     companyApplications,
     tradeOperations,
-    permits,
     operations,
     revenue,
     compliance,
@@ -49,7 +83,6 @@ export default function App() {
     hrStats,
     contractors,
     maintenance,
-    teamMembers,
     allUsers,
     loading,
     fetchData,
@@ -87,17 +120,8 @@ export default function App() {
     newIncident,
     setNewIncident,
     reportIncidentHandler,
-
-    showPermitModal,
-    setShowPermitModal,
-    newPermit,
-    setNewPermit,
-    selectedPermit,
-    setSelectedPermit,
-    permitExpiry,
-    setPermitExpiry,
-    applyPermitHandler,
-    updatePermitHandler,
+    submitIncidentFollowUpHandler,
+    updateIncidentStatusHandler,
 
     showAddEmpModal,
     setShowAddEmpModal,
@@ -126,6 +150,7 @@ export default function App() {
     setNewOps,
     logProductionHandler,
 
+    inviteUserHandler,
     updateUserRoleHandler,
   } = useAppForms({
     token,
@@ -135,7 +160,59 @@ export default function App() {
   const changePasswordHandler = handleChangePassword(user, setUser, token, setActiveTab, fetchData);
   const userHasRole = (roleNeeded: string) => hasRole(user, roleNeeded);
 
-  useNotifications({ token, user });
+  const globalSearchResults = useMemo(
+    () =>
+      buildGlobalSearchResults({
+        query: deferredGlobalSearchQuery,
+        user,
+        companies,
+        companyApplications,
+        tradeOperations,
+        compliance,
+        incidents,
+        assets,
+      }),
+    [
+      deferredGlobalSearchQuery,
+      user,
+      companies,
+      companyApplications,
+      tradeOperations,
+      compliance,
+      incidents,
+      assets,
+    ],
+  );
+
+  const {
+    liveNotifications,
+    unreadLiveNotifications,
+    markLiveNotificationsRead,
+  } = useNotifications({ token, user });
+
+  const actionCenterItems = useMemo(
+    () =>
+      buildActionCenterItems({
+        user,
+        companyApplications,
+        tradeOperations,
+        compliance,
+        incidents,
+        assets,
+        maintenance,
+        revenue,
+      }),
+    [
+      user,
+      companyApplications,
+      tradeOperations,
+      compliance,
+      incidents,
+      assets,
+      maintenance,
+      revenue,
+    ],
+  );
 
   useEffect(() => {
     const savedUser = localStorage.getItem('petroflow_user');
@@ -180,25 +257,37 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-brand-bg overflow-hidden">
+    <div className="lg:flex h-dvh bg-brand-bg overflow-hidden">
       <Toaster />
 
       <Sidebar
         user={user}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         onLogout={handleLogout}
         userHasRole={userHasRole}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
       />
 
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 min-w-0 flex flex-col h-dvh overflow-hidden">
         <Header
           user={user}
           activeTab={activeTab}
           onSyncData={fetchData}
+          onOpenNavigation={() => setMobileNavOpen(true)}
+          globalSearchQuery={globalSearchQuery}
+          onGlobalSearchQueryChange={setGlobalSearchQuery}
+          globalSearchResults={globalSearchResults}
+          onSelectGlobalSearchResult={handleSelectGlobalSearchResult}
+          actionCenterItems={actionCenterItems}
+          liveNotifications={liveNotifications}
+          unreadLiveNotifications={unreadLiveNotifications}
+          onMarkNotificationsRead={markLiveNotificationsRead}
+          onSelectActionTarget={navigateToTarget}
         />
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {user.mustChangePassword && <ChangePasswordModal onComplete={changePasswordHandler} />}
 
           <AnimatePresence mode="wait">
@@ -212,6 +301,8 @@ export default function App() {
               <ContentRouter
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
+                onRefresh={fetchData}
+                searchNavigation={searchNavigation}
                 token={token}
                 user={user}
                 userHasRole={userHasRole}
@@ -219,7 +310,6 @@ export default function App() {
                 companies={companies}
                 companyApplications={companyApplications}
                 tradeOperations={tradeOperations}
-                permits={permits}
                 operations={operations}
                 revenue={revenue}
                 compliance={compliance}
@@ -232,7 +322,6 @@ export default function App() {
                 hrStats={hrStats}
                 contractors={contractors}
                 maintenance={maintenance}
-                teamMembers={teamMembers}
                 allUsers={allUsers}
                 actionLoading={actionLoading}
                 showRegModal={showRegModal}
@@ -258,16 +347,8 @@ export default function App() {
                 newIncident={newIncident}
                 setNewIncident={setNewIncident}
                 reportIncidentHandler={reportIncidentHandler}
-                showPermitModal={showPermitModal}
-                setShowPermitModal={setShowPermitModal}
-                newPermit={newPermit}
-                setNewPermit={setNewPermit}
-                selectedPermit={selectedPermit}
-                setSelectedPermit={setSelectedPermit}
-                permitExpiry={permitExpiry}
-                setPermitExpiry={setPermitExpiry}
-                applyPermitHandler={applyPermitHandler}
-                updatePermitHandler={updatePermitHandler}
+                submitIncidentFollowUpHandler={submitIncidentFollowUpHandler}
+                updateIncidentStatusHandler={updateIncidentStatusHandler}
                 hrTab={hrTab}
                 setHrTab={setHrTab}
                 showAddEmpModal={showAddEmpModal}
@@ -291,7 +372,7 @@ export default function App() {
                 setNewOps={setNewOps}
                 logProductionHandler={logProductionHandler}
                 updateUserRoleHandler={updateUserRoleHandler}
-                onInviteUser={() => setAuthView('signup')}
+                onInviteUser={inviteUserHandler}
               />
             </motion.div>
           </AnimatePresence>

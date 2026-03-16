@@ -20,8 +20,6 @@ export const LoginPage = ({ onLogin, onSwitchToSignup, onSwitchToForgot }: { onL
         { email: 'achonma.tk@gmail.com', pass: 'Achonmatanko10', role: 'Contractor' },
         { email: 'compliance@ogfza.gov', pass: 'demo123', role: 'Compliance' },
         { email: 'ops@shell.com', pass: 'demo123', role: 'Operations' },
-        { email: 'finance@ogfza.gov', pass: 'demo123', role: 'Finance' },
-        { email: 'hr@ogfza.gov', pass: 'demo123', role: 'HR Manager' },
     ];
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -58,10 +56,10 @@ export const LoginPage = ({ onLogin, onSwitchToSignup, onSwitchToForgot }: { onL
                     <div className="w-12 h-12 bg-brand-ink flex items-center justify-center rounded-sm">
                         <TrendingUp size={24} className="text-brand-bg" />
                     </div>
-                    <h1 className="font-bold tracking-tighter text-2xl text-center">OGFZA_digital_automation</h1>
+                    <h1 className="font-bold tracking-tighter text-2xl text-center">Oil & Gas Free Zone Authority</h1>
                 </div>
 
-                <h2 className="text-xl font-serif italic mb-6 text-center">Operational Access</h2>
+                <h5 className="font-serif mb-6 text-center" style={{ fontSize: '10px' }}>PROTOTYPE V1.0</h5>
 
                 {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs font-bold uppercase tracking-widest">{error}</div>}
 

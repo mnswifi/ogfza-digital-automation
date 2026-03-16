@@ -5,10 +5,9 @@ import {
     Company,
     CompanyApplication,
     TradeOperationRequest,
-    Permit,
     Operation,
     Revenue,
-    ComplianceAudit,
+    ComplianceCase,
     Asset,
     Incident,
     Employee,
@@ -32,10 +31,9 @@ export function useAppData({ token, user, onAuthFail }: UseAppDataParams) {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [companyApplications, setCompanyApplications] = useState<CompanyApplication[]>([]);
     const [tradeOperations, setTradeOperations] = useState<TradeOperationRequest[]>([]);
-    const [permits, setPermits] = useState<Permit[]>([]);
     const [operations, setOperations] = useState<Operation[]>([]);
     const [revenue, setRevenue] = useState<Revenue[]>([]);
-    const [compliance, setCompliance] = useState<ComplianceAudit[]>([]);
+    const [compliance, setCompliance] = useState<ComplianceCase[]>([]);
     const [assets, setAssets] = useState<Asset[]>([]);
     const [incidents, setIncidents] = useState<Incident[]>([]);
 
@@ -65,9 +63,25 @@ export function useAppData({ token, user, onAuthFail }: UseAppDataParams) {
             const canAccessTradeOperations =
                 Boolean(user?.role?.includes('Admin')) ||
                 Boolean(user?.role?.includes('Compliance')) ||
+                Boolean(user?.role?.includes('Operations')) ||
                 Boolean(user?.role?.includes('Contractor'));
+            const canAccessComplianceWorkflow =
+                Boolean(user?.role?.includes('Admin')) ||
+                Boolean(user?.role?.includes('Compliance')) ||
+                Boolean(user?.role?.includes('Contractor'));
+            const canAccessIncidentWorkflow =
+                Boolean(user?.role?.includes('Admin')) ||
+                Boolean(user?.role?.includes('Compliance')) ||
+                Boolean(user?.role?.includes('Contractor'));
+            const canAccessAssetDirectory =
+                Boolean(user?.role?.includes('Admin')) ||
+                Boolean(user?.role?.includes('Operations')) ||
+                Boolean(user?.role?.includes('Compliance'));
+            const canAccessOperationsControl =
+                Boolean(user?.role?.includes('Admin')) ||
+                Boolean(user?.role?.includes('Operations'));
 
-            const [s, c, companyApps, tradeOps, p, o, r, comp, a, inc, emp, att, certs, shf, hrs, usersData] = await Promise.all([
+            const [s, c, companyApps, tradeOps, o, r, comp, a, inc, emp, att, certs, shf, hrs, usersData] = await Promise.all([
                 fetch('/api/dashboard/stats', { headers }).then((res) => res.json()),
                 fetch('/api/companies', { headers }).then((res) => res.json()),
                 canAccessCompanyApplications
@@ -80,12 +94,27 @@ export function useAppData({ token, user, onAuthFail }: UseAppDataParams) {
                         res.ok ? res.json() : []
                     )
                     : Promise.resolve([]),
-                fetch('/api/permits', { headers }).then((res) => res.json()),
-                fetch('/api/operations', { headers }).then((res) => res.json()),
+                canAccessOperationsControl
+                    ? fetch('/api/operations', { headers }).then((res) =>
+                        res.ok ? res.json() : []
+                    )
+                    : Promise.resolve([]),
                 fetch('/api/revenue', { headers }).then((res) => res.json()),
-                fetch('/api/compliance', { headers }).then((res) => res.json()),
-                fetch('/api/assets', { headers }).then((res) => res.json()),
-                fetch('/api/incidents', { headers }).then((res) => res.json()),
+                canAccessComplianceWorkflow
+                    ? fetch('/api/compliance', { headers }).then((res) =>
+                        res.ok ? res.json() : []
+                    )
+                    : Promise.resolve([]),
+                canAccessAssetDirectory
+                    ? fetch('/api/assets', { headers }).then((res) =>
+                        res.ok ? res.json() : []
+                    )
+                    : Promise.resolve([]),
+                canAccessIncidentWorkflow
+                    ? fetch('/api/incidents', { headers }).then((res) =>
+                        res.ok ? res.json() : []
+                    )
+                    : Promise.resolve([]),
                 fetch('/api/hr/employees', { headers }).then((res) => res.json()),
                 fetch('/api/hr/attendance', { headers }).then((res) => res.json()),
                 fetch('/api/hr/certifications', { headers }).then((res) => res.json()),
@@ -100,7 +129,6 @@ export function useAppData({ token, user, onAuthFail }: UseAppDataParams) {
             setCompanies(c);
             setCompanyApplications(companyApps);
             setTradeOperations(tradeOps);
-            setPermits(p);
             setOperations(o);
             setRevenue(r);
             setCompliance(comp);
@@ -115,7 +143,11 @@ export function useAppData({ token, user, onAuthFail }: UseAppDataParams) {
 
             const [cont, maint, team] = await Promise.all([
                 fetch('/api/contractors', { headers }).then((res) => res.json()),
-                fetch('/api/maintenance', { headers }).then((res) => res.json()),
+                canAccessOperationsControl
+                    ? fetch('/api/maintenance', { headers }).then((res) =>
+                        res.ok ? res.json() : []
+                    )
+                    : Promise.resolve([]),
                 fetch('/api/change-management/team', { headers }).then((res) => res.json()),
             ]);
 
@@ -135,7 +167,6 @@ export function useAppData({ token, user, onAuthFail }: UseAppDataParams) {
         companies,
         companyApplications,
         tradeOperations,
-        permits,
         operations,
         revenue,
         compliance,

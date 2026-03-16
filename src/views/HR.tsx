@@ -9,6 +9,7 @@ import {
     Incident,
     Shift,
 } from '@/middleware/types.middleware';
+import { printStructuredReport } from '@/src/utils/printDocuments';
 
 type HrTab = 'employees' | 'attendance' | 'certs' | 'shifts' | 'safety';
 
@@ -95,6 +96,75 @@ export default function HRView({
     onLogAttendance,
     onLogCert,
 }: HRProps) {
+    const handlePrintDepartmentReport = () => {
+        printStructuredReport({
+            documentTitle: 'OGFZA HR Department Report',
+            kicker: 'OGFZA HR & Workforce',
+            title: 'HR & Workforce Digitization Report',
+            subtitle: 'Workforce overview covering personnel records, attendance, certifications, shifts, and safety incidents.',
+            reference: `Generated ${new Intl.DateTimeFormat('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            }).format(new Date())}`,
+            sections: [
+                {
+                    title: 'Workforce Summary',
+                    kind: 'fields',
+                    columns: 3,
+                    fields: [
+                        { label: 'Active Personnel', value: hrStats?.totalEmployees.count || employees.length },
+                        { label: 'Attendance Logs', value: attendance.length },
+                        { label: 'Certifications', value: certifications.length },
+                        { label: 'Shift Records', value: shifts.length },
+                        { label: 'Safety Incidents', value: incidents.length },
+                    ],
+                },
+                {
+                    title: 'Personnel Registry',
+                    kind: 'table',
+                    headers: ['Name', 'Department', 'Position', 'Zone', 'Company', 'Status'],
+                    rows: employees.map((employee) => ([
+                        employee.full_name,
+                        employee.department,
+                        employee.position,
+                        employee.zone,
+                        employee.company,
+                        employee.status,
+                    ])),
+                },
+                {
+                    title: 'Attendance Register',
+                    kind: 'table',
+                    headers: ['Employee', 'Date', 'Shift', 'Check In', 'Check Out', 'Status'],
+                    rows: attendance.map((record) => ([
+                        record.full_name,
+                        record.date,
+                        record.shift,
+                        record.check_in || '--',
+                        record.check_out || '--',
+                        record.status,
+                    ])),
+                },
+                {
+                    title: 'Certification Register',
+                    kind: 'table',
+                    headers: ['Employee', 'Certification', 'Issued', 'Expiry'],
+                    rows: certifications.map((record) => ([
+                        record.full_name,
+                        record.cert_name,
+                        record.issued_date,
+                        record.expiry_date,
+                    ])),
+                },
+            ],
+            footerNote: 'Generated from the HR & Workforce module in the OGFZA Digital Automation prototype.',
+        });
+    };
+
     return (
         <div className="space-y-6 relative">
             {showAddEmpModal && (
@@ -375,7 +445,7 @@ export default function HRView({
                     Field Attendance • Deployments • Certifications
                 </p>
                 <button
-                    onClick={() => window.print()}
+                    onClick={handlePrintDepartmentReport}
                     className="absolute top-8 right-8 border border-white/20 hover:bg-white/10 px-4 py-2 text-[10px] uppercase tracking-widest font-bold transition-colors"
                 >
                     Export Dept Report

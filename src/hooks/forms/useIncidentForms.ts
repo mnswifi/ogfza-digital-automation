@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { handleReportIncident } from '../useAuthSessions';
+import {
+    handleReportIncident,
+    handleSubmitIncidentFollowUp,
+    handleUpdateIncidentStatus,
+} from '../useAuthSessions';
 import { createInitialIncidentForm } from '../appInitialState';
 import type { IncidentForm, SharedFormHookParams } from '../../types/appFormTypes';
 
@@ -22,11 +26,27 @@ export function useIncidentForms({
         fetchData
     );
 
+    const submitIncidentFollowUpHandler = handleSubmitIncidentFollowUp(
+        actionLoading,
+        setActionLoading,
+        token,
+        fetchData
+    );
+
+    const updateIncidentStatusHandler = handleUpdateIncidentStatus(
+        actionLoading,
+        setActionLoading,
+        token,
+        fetchData
+    );
+
     return {
         showIncidentModal,
         setShowIncidentModal,
         newIncident,
         setNewIncident,
         reportIncidentHandler,
+        submitIncidentFollowUpHandler,
+        updateIncidentStatusHandler,
     };
 }

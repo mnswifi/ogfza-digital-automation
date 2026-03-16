@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { User } from '@/middleware/types.middleware';
@@ -8,14 +8,40 @@ type UseNotificationsParams = {
   user: User | null;
 };
 
+export type LiveNotification = {
+  id: string;
+  type: string;
+  message: string;
+  detail?: string;
+  timestamp: string;
+};
+
 export function useNotifications({ token, user }: UseNotificationsParams) {
+  const [liveNotifications, setLiveNotifications] = useState<LiveNotification[]>([]);
+  const [unreadLiveNotifications, setUnreadLiveNotifications] = useState(0);
+
   useEffect(() => {
     if (!token || !user) return;
 
     const eventSource = new EventSource('/api/notifications/stream');
 
     eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      const data = JSON.parse(event.data) as {
+        type: string;
+        message: string;
+        detail?: string;
+        timestamp?: string;
+      };
+      const notification: LiveNotification = {
+        id: `${data.timestamp || Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type: data.type,
+        message: data.message,
+        detail: data.detail,
+        timestamp: data.timestamp || new Date().toISOString(),
+      };
+
+      setLiveNotifications((current) => [notification, ...current].slice(0, 15));
+      setUnreadLiveNotifications((current) => current + 1);
 
       if (data.type === 'SUCCESS') {
         toast.success(
@@ -64,4 +90,14 @@ export function useNotifications({ token, user }: UseNotificationsParams) {
       eventSource.close();
     };
   }, [token, user]);
+
+  const markLiveNotificationsRead = () => {
+    setUnreadLiveNotifications(0);
+  };
+
+  return {
+    liveNotifications,
+    unreadLiveNotifications,
+    markLiveNotificationsRead,
+  };
 }

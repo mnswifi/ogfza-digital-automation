@@ -27,11 +27,9 @@ export const canAccessTab = (user: User | null, tab: string) => {
     if (tab === 'companies' && (hasRole(user, 'Compliance') || isContractor)) return true;
     if (tab === 'trade-operations' && (hasRole(user, 'Compliance') || isContractor)) return true;
 
-    if (tab === 'compliance' || tab === 'incidents') {
-        if (hasRole(user, 'Compliance')) return true;
-    }
+    if (tab === 'compliance' && (hasRole(user, 'Compliance') || isContractor)) return true;
+    if (tab === 'incidents' && (hasRole(user, 'Compliance') || isContractor)) return true;
 
-    if (tab === 'permits' && (hasRole(user, 'Compliance') || hasRole(user, 'Operations'))) return true;
     if (tab === 'logistics' && (hasRole(user, 'Operations') || hasRole(user, 'Admin'))) return true;
     if (tab === 'settings' && hasRole(user, 'Admin')) return true;
 

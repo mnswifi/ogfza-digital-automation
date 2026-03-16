@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
     ArrowRight,
     CheckCircle2,
     ChevronDown,
     Clock3,
+    Printer,
     X,
 } from 'lucide-react';
 import type {
@@ -29,12 +30,16 @@ import {
 } from '@/src/constants/tradeOperations';
 import type { LicenseType } from '@/src/constants/companyApplication';
 import type { TradeOperationForm } from '@/src/types/appFormTypes';
+import { printTradeOperationSummary } from '@/src/utils/printDocuments';
+import ModuleFilters from '@/src/components/ModuleFilters';
+import { matchesSearchQuery, type ModuleSearchTarget } from '@/src/utils/globalSearch';
 
 type TradeOperationsProps = {
     token: string | null;
     user: User;
     companies: Company[];
     tradeOperations: TradeOperationRequest[];
+    searchNavigation?: ModuleSearchTarget | null;
     showTradeOperationModal: boolean;
     setShowTradeOperationModal: React.Dispatch<React.SetStateAction<boolean>>;
     editingTradeOperationId: number | null;
@@ -56,6 +61,8 @@ const toneClasses = {
     emerald: 'bg-emerald-50 text-emerald-700',
     rose: 'bg-rose-50 text-rose-700',
 } as const;
+
+const printActionButtonClassName = 'inline-flex items-center gap-2 border border-brand-line/20 px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-ink/5 transition-colors';
 
 const formatDisplayDate = (value?: string | null) => {
     if (!value) return '--';
@@ -284,6 +291,7 @@ export default function TradeOperations({
     user,
     companies,
     tradeOperations,
+    searchNavigation,
     showTradeOperationModal,
     setShowTradeOperationModal,
     editingTradeOperationId,
@@ -316,6 +324,11 @@ export default function TradeOperations({
     const [tradeOperationReviewError, setTradeOperationReviewError] = useState<string | null>(null);
     const [showTradeOperationReviewModal, setShowTradeOperationReviewModal] = useState(false);
     const [reviewNote, setReviewNote] = useState('');
+    const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
+    const [requestSearchQuery, setRequestSearchQuery] = useState('');
+    const [requestStatusFilter, setRequestStatusFilter] = useState('All');
+    const deferredCatalogSearchQuery = useDeferredValue(catalogSearchQuery);
+    const deferredRequestSearchQuery = useDeferredValue(requestSearchQuery);
 
     const licensedCompanies = companies.filter((company) => Boolean(company.license_no));
     const catalogFamilies = (Object.keys(tradeOperationFamilyCatalog) as Array<keyof typeof tradeOperationFamilyCatalog>)
@@ -339,19 +352,91 @@ export default function TradeOperations({
         })
         .filter((family) => family.services.length > 0);
 
+    const filteredCatalogFamilies = useMemo(
+        () =>
+            catalogFamilies
+                .map((family) => ({
+                    ...family,
+                    services: family.services.filter((service) =>
+                        matchesSearchQuery(
+                            deferredCatalogSearchQuery,
+                            family.label,
+                            family.description,
+                            service.definition.label,
+                            service.definition.description,
+                            service.definition.familyLabel,
+                            service.definition.feeGuidance.join(' '),
+                        ),
+                    ),
+                }))
+                .filter((family) => family.services.length > 0),
+        [catalogFamilies, deferredCatalogSearchQuery],
+    );
+    const filteredCatalogServiceCount = filteredCatalogFamilies.reduce(
+        (total, family) => total + family.services.length,
+        0,
+    );
+    const requestStatusOptions = useMemo(
+        () => [
+            'All',
+            ...Array.from(
+                new Set(tradeOperations.map((request) => getTradeOperationStatusLabel(request)).filter(Boolean)),
+            ).sort(),
+        ],
+        [tradeOperations],
+    );
+    const filteredTradeOperations = useMemo(
+        () =>
+            tradeOperations.filter((request) => {
+                const statusLabel = getTradeOperationStatusLabel(request);
+                const serviceLabel = getTradeOperationService(request.service_type)?.label || request.service_type;
+                const matchesQuery = matchesSearchQuery(
+                    deferredRequestSearchQuery,
+                    request.request_reference,
+                    request.company_name,
+                    request.company_license_no,
+                    request.company_license_type,
+                    request.submitted_by_name,
+                    request.service_family,
+                    serviceLabel,
+                    statusLabel,
+                );
+                const matchesStatus =
+                    requestStatusFilter === 'All' || statusLabel === requestStatusFilter;
+
+                return matchesQuery && matchesStatus;
+            }),
+        [tradeOperations, deferredRequestSearchQuery, requestStatusFilter],
+    );
+
     useEffect(() => {
         if (expandedFamilyKey === undefined) {
-            setExpandedFamilyKey(catalogFamilies[0]?.key ?? null);
+            setExpandedFamilyKey(filteredCatalogFamilies[0]?.key ?? null);
             return;
         }
 
         if (
             expandedFamilyKey !== null &&
-            !catalogFamilies.some((family) => family.key === expandedFamilyKey)
+            !filteredCatalogFamilies.some((family) => family.key === expandedFamilyKey)
         ) {
-            setExpandedFamilyKey(catalogFamilies[0]?.key ?? null);
+            setExpandedFamilyKey(filteredCatalogFamilies[0]?.key ?? null);
         }
-    }, [catalogFamilies, expandedFamilyKey]);
+    }, [filteredCatalogFamilies, expandedFamilyKey]);
+
+    useEffect(() => {
+        if (!searchNavigation) return;
+
+        if (searchNavigation.section === 'requests') {
+            setActiveSection('requests');
+            setRequestSearchQuery(searchNavigation.query || '');
+            return;
+        }
+
+        if (isContractor) {
+            setActiveSection('catalog');
+            setCatalogSearchQuery(searchNavigation.query || '');
+        }
+    }, [isContractor, searchNavigation]);
 
     const selectedServiceDefinition = getTradeOperationService(newTradeOperation.serviceType);
     const eligibleCompaniesForSelectedService = selectedServiceDefinition
@@ -575,7 +660,16 @@ export default function TradeOperations({
                             </p>
                         </div>
                     ) : (
-                        catalogFamilies.map((family) => {
+                        <>
+                            <ModuleFilters
+                                searchValue={catalogSearchQuery}
+                                onSearchChange={setCatalogSearchQuery}
+                                searchPlaceholder="Search by workflow family, service name, or fee guide"
+                                resultCount={filteredCatalogServiceCount}
+                                resultLabel="eligible services"
+                            />
+
+                            {filteredCatalogFamilies.map((family) => {
                             const isExpanded = expandedFamilyKey === family.key;
 
                             return (
@@ -664,7 +758,8 @@ export default function TradeOperations({
                                     )}
                                 </section>
                             );
-                        })
+                            })}
+                        </>
                     )}
                 </div>
             )}
@@ -681,9 +776,25 @@ export default function TradeOperations({
                         </div>
 
                         <span className="text-[10px] uppercase tracking-widest font-bold opacity-30">
-                            {tradeOperations.length} Total
+                            {filteredTradeOperations.length} Showing
                         </span>
                     </div>
+
+                    <ModuleFilters
+                        searchValue={requestSearchQuery}
+                        onSearchChange={setRequestSearchQuery}
+                        searchPlaceholder="Search by company, reference, service, submitter, or status"
+                        selects={[
+                            {
+                                label: 'Status',
+                                value: requestStatusFilter,
+                                options: requestStatusOptions.map((option) => ({ label: option, value: option })),
+                                onChange: setRequestStatusFilter,
+                            },
+                        ]}
+                        resultCount={filteredTradeOperations.length}
+                        resultLabel="matching requests"
+                    />
 
                     <table className="w-full text-left">
                         <thead>
@@ -699,7 +810,7 @@ export default function TradeOperations({
                             </tr>
                         </thead>
                         <tbody>
-                            {tradeOperations.map((request) => {
+                            {filteredTradeOperations.map((request) => {
                                 const statusLabel = getTradeOperationStatusLabel(request);
                                 const serviceDefinition = getTradeOperationService(request.service_type);
                                 const canActOnRequest = canReviewRequests && request.status === 'Submitted';
@@ -768,13 +879,15 @@ export default function TradeOperations({
                                     </tr>
                                 );
                             })}
-                            {tradeOperations.length === 0 && (
+                            {filteredTradeOperations.length === 0 && (
                                 <tr>
                                     <td
                                         colSpan={canReviewRequests ? 8 : 7}
                                         className="p-8 text-center  opacity-40"
                                     >
-                                        No trade operation requests available yet.
+                                        {tradeOperations.length === 0
+                                            ? 'No trade operation requests available yet.'
+                                            : 'No trade operation requests match the current filters.'}
                                     </td>
                                 </tr>
                             )}
@@ -1009,9 +1122,21 @@ export default function TradeOperations({
                                         {selectedTradeOperation.request_reference}
                                     </p>
                                 </div>
-                                <button type="button" onClick={() => setShowTradeOperationStatusModal(false)}>
-                                    <X size={20} />
-                                </button>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    {selectedTradeOperationDetail && (
+                                        <button
+                                            type="button"
+                                            onClick={() => printTradeOperationSummary(selectedTradeOperationDetail)}
+                                            className={printActionButtonClassName}
+                                        >
+                                            <Printer size={14} />
+                                            Print Request Summary
+                                        </button>
+                                    )}
+                                    <button type="button" onClick={() => setShowTradeOperationStatusModal(false)}>
+                                        <X size={20} />
+                                    </button>
+                                </div>
                             </div>
 
                             {tradeOperationStatusLoading && (
@@ -1165,9 +1290,21 @@ export default function TradeOperations({
                                         {selectedTradeOperationForReview?.request_reference}
                                     </p>
                                 </div>
-                                <button type="button" onClick={() => setShowTradeOperationReviewModal(false)}>
-                                    <X size={20} />
-                                </button>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    {selectedTradeOperationReviewDetail && (
+                                        <button
+                                            type="button"
+                                            onClick={() => printTradeOperationSummary(selectedTradeOperationReviewDetail)}
+                                            className={printActionButtonClassName}
+                                        >
+                                            <Printer size={14} />
+                                            Print Request Summary
+                                        </button>
+                                    )}
+                                    <button type="button" onClick={() => setShowTradeOperationReviewModal(false)}>
+                                        <X size={20} />
+                                    </button>
+                                </div>
                             </div>
 
                             {tradeOperationReviewLoading && (

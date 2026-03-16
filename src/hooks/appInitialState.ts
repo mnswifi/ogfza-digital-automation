@@ -55,15 +55,11 @@ export const createInitialTradeOperationForm = () => ({
 });
 
 export const createInitialIncidentForm = () => ({
-    company_name: '',
+    companyId: '',
+    assetId: '',
     incident_type: 'HSE',
     severity: 'Medium',
     description: '',
-});
-
-export const createInitialPermitForm = () => ({
-    company_id: '',
-    permit_type: '',
 });
 
 export const createInitialEmployeeForm = () => ({
@@ -93,8 +89,9 @@ export const createInitialCertificationForm = () => ({
 });
 
 export const createInitialOpsForm = () => ({
-    field_name: '',
+    assetId: '',
     production_volume: '',
     downtime_hours: '',
     report_date: '',
+    notes: '',
 });

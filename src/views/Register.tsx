@@ -63,7 +63,7 @@ export const SignupPage = ({ onSwitchToLogin }: { onSwitchToLogin: () => void })
                 animate={{ opacity: 1, scale: 1 }}
                 className="w-full max-w-md bg-white border border-brand-line/10 p-8 shadow-2xl"
             >
-                <h2 className="text-xl font-serif italic mb-6 text-center">Platform Registration</h2>
+                <h2 className="text-xl font-serif mb-6 text-center">OGFZA User Registration</h2>
 
                 {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs font-bold uppercase tracking-widest">{error}</div>}
 

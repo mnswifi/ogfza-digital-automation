@@ -11,8 +11,12 @@
 }
 
 @layer base {
+  html, body, #root {
+    min-height: 100%;
+  }
+
   body {
-    @apply bg-brand-bg text-brand-ink font-sans antialiased;
+    @apply bg-brand-bg text-brand-ink font-sans antialiased overflow-x-hidden;
   }
 }
 

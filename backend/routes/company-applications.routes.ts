@@ -64,6 +64,14 @@ const applicationStatuses = {
     rejected: 'Rejected',
 } as const;
 
+const buildRevenueInvoiceNumber = (applicationId: number, licenseNumber?: string | null) => (
+    licenseNumber ? `LIC-${licenseNumber}` : `LIC-APP-${applicationId}`
+);
+
+const buildRevenueDescription = (licenseType?: string | null) => (
+    `${licenseType || 'Free Zone Licence'} Fee`
+);
+
 const toNullableString = (value: unknown) => {
     if (typeof value !== "string") return null;
 
@@ -1833,6 +1841,7 @@ router.patch("/:id/confirm-payment", authenticateToken, async (req: Authenticate
         const licenseNumber =
             application.linked_company_license_no ||
             await generateUniqueLicenseNumber(transaction);
+        const revenueInvoiceNumber = buildRevenueInvoiceNumber(application.id, licenseNumber);
 
         let linkedCompanyId = application.linked_company_id;
 
@@ -1926,6 +1935,56 @@ router.patch("/:id/confirm-payment", authenticateToken, async (req: Authenticate
                 payment_confirmed_by_user_id = @payment_confirmed_by_user_id,
                 updated_at = SYSDATETIME()
             WHERE id = @id
+        `);
+
+        if (!linkedCompanyId) {
+            throw new Error("Failed to resolve the registered company for the revenue entry.");
+        }
+
+        const revenueRequest = new sql.Request(transaction);
+        revenueRequest
+            .input("company_id", sql.Int, linkedCompanyId)
+            .input("amount", sql.Decimal(18, 2), feeSchedule.totalUsd)
+            .input("description", sql.NVarChar(sql.MAX), buildRevenueDescription(approvedLicenseType))
+            .input("payment_date", sql.Date, issuanceTimestamp)
+            .input("status", sql.NVarChar, "Paid")
+            .input("invoice_no", sql.NVarChar, revenueInvoiceNumber);
+
+        await revenueRequest.query(`
+            IF EXISTS (
+                SELECT 1
+                FROM dbo.revenue
+                WHERE invoice_no = @invoice_no
+            )
+            BEGIN
+                UPDATE dbo.revenue
+                SET
+                    company_id = @company_id,
+                    amount = @amount,
+                    description = @description,
+                    payment_date = @payment_date,
+                    status = @status
+                WHERE invoice_no = @invoice_no
+            END
+            ELSE
+            BEGIN
+                INSERT INTO dbo.revenue (
+                    company_id,
+                    amount,
+                    description,
+                    payment_date,
+                    status,
+                    invoice_no
+                )
+                VALUES (
+                    @company_id,
+                    @amount,
+                    @description,
+                    @payment_date,
+                    @status,
+                    @invoice_no
+                )
+            END
         `);
 
         await appendApplicationEvent(transaction, {

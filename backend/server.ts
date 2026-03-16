@@ -24,7 +24,6 @@ import notificationRoutes from "./routes/notification.routes";
 import companyRoutes from "./routes/companies.routes";
 import companyApplicationsRoutes from "./routes/company-applications.routes";
 import tradeOperationsRoutes from "./routes/trade-operations.routes";
-import permitsRoutes from "./routes/permits.routes";
 import operationsRoutes from "./routes/operations.routes";
 import revenueRoutes from "./routes/revenue.routes";
 import complianceRoutes from "./routes/compliance.routes";
@@ -48,7 +47,6 @@ async function startServer() {
   const app = express();
   app.use(express.json());
   app.use("/api/auth", authRoutes);
-  app.use("/api/permits", permitsRoutes);
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/notifications", notificationRoutes);
   app.use("/api/companies", companyRoutes);

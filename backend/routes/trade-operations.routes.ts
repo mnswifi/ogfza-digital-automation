@@ -311,9 +311,10 @@ const rollbackQuietly = async (transaction: sql.Transaction) => {
 
 router.get("/", authenticateToken, async (req: AuthenticatedRequest, res) => {
     const canReviewRequests = hasRole(req.user?.role, ["Admin", "Compliance"]);
+    const canMonitorRequests = hasRole(req.user?.role, ["Operations"]);
     const isContractor = hasRole(req.user?.role, ["Contractor"]);
 
-    if (!canReviewRequests && !isContractor) return res.sendStatus(403);
+    if (!canReviewRequests && !canMonitorRequests && !isContractor) return res.sendStatus(403);
 
     try {
         const request = await createRequest();
@@ -345,7 +346,7 @@ router.get("/", authenticateToken, async (req: AuthenticatedRequest, res) => {
                 ON submitter.id = r.submitted_by_user_id
         `;
 
-        if (!canReviewRequests && isContractor) {
+        if (!canReviewRequests && !canMonitorRequests && isContractor) {
             query += `
                 WHERE r.submitted_by_user_id = @user_id
             `;
@@ -369,13 +370,14 @@ router.get("/", authenticateToken, async (req: AuthenticatedRequest, res) => {
 router.get("/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     const tradeOperationId = Number(req.params.id);
     const canReviewRequests = hasRole(req.user?.role, ["Admin", "Compliance"]);
+    const canMonitorRequests = hasRole(req.user?.role, ["Operations"]);
     const isContractor = hasRole(req.user?.role, ["Contractor"]);
 
     if (!Number.isInteger(tradeOperationId) || tradeOperationId <= 0) {
         return res.status(400).json({ error: "Invalid trade operation request id." });
     }
 
-    if (!canReviewRequests && !isContractor) return res.sendStatus(403);
+    if (!canReviewRequests && !canMonitorRequests && !isContractor) return res.sendStatus(403);
 
     try {
         const request = await createRequest();
@@ -430,7 +432,7 @@ router.get("/:id", authenticateToken, async (req: AuthenticatedRequest, res) => 
             WHERE r.id = @id
         `;
 
-        if (!canReviewRequests && isContractor) {
+        if (!canReviewRequests && !canMonitorRequests && isContractor) {
             query += `
                 AND r.submitted_by_user_id = @user_id
             `;

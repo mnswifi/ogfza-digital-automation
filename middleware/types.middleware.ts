@@ -20,9 +20,10 @@ export interface User {
 
 export interface Stats {
     totalCompanies: { count: number };
-    pendingPermits: { count: number };
     totalProduction: { total: number };
     totalRevenue: { total: number };
+    confirmedLicencePayments?: { count: number };
+    pendingLicencePayments?: { count: number };
     totalIncidents?: { count: number };
 }
 
@@ -269,21 +270,17 @@ export interface TradeOperationRequestDetail extends TradeOperationRequest {
     events?: TradeOperationEvent[];
 }
 
-export interface Permit {
-    id: number;
-    company_name: string;
-    permit_type: string;
-    status: string;
-    applied_date: string;
-    expiry_date: string;
-}
-
 export interface Operation {
     id: number;
+    asset_id?: number | null;
+    asset_name?: string | null;
+    company_id?: number | null;
+    company_name?: string | null;
     field_name: string;
     production_volume: number;
     downtime_hours: number;
     report_date: string;
+    notes?: string | null;
 }
 
 export interface Revenue {
@@ -295,34 +292,113 @@ export interface Revenue {
     status: string;
 }
 
-export interface ComplianceAudit {
+export interface ComplianceCase {
     id: number;
+    company_id: number;
     company_name: string;
-    audit_date: string;
-    inspector: string;
-    findings: string;
+    company_license_no?: string | null;
+    case_type: string;
+    title: string;
+    document_type?: string | null;
+    severity?: string | null;
+    request_note: string;
     status: string;
-    penalty_amount: number;
+    due_date?: string | null;
+    requested_at: string;
+    requested_by_name?: string | null;
+    contractor_response_note?: string | null;
+    contractor_response_file_name?: string | null;
+    contractor_response_submitted_at?: string | null;
+    contractor_response_submitted_by_name?: string | null;
+    review_note?: string | null;
+    returned_at?: string | null;
+    returned_by_name?: string | null;
+    resolved_at?: string | null;
+    resolved_by_name?: string | null;
+    closed_at?: string | null;
+    closed_by_name?: string | null;
+    updated_at?: string | null;
+}
+
+export interface ComplianceCaseEvent {
+    id: number;
+    case_id: number;
+    event_type: string;
+    actor_user_id?: number | null;
+    actor_name?: string | null;
+    actor_role?: string | null;
+    from_status?: string | null;
+    to_status?: string | null;
+    note?: string | null;
+    created_at: string;
+}
+
+export interface ComplianceCaseDetail extends ComplianceCase {
+    representative_email?: string | null;
+    primary_contact_email?: string | null;
+    events?: ComplianceCaseEvent[];
 }
 
 export interface Asset {
     id: number;
+    company_id?: number | null;
+    company_name?: string | null;
     asset_name: string;
     type: string;
     location_coordinates: string;
     status: string;
-    maintenance_date: string;
+    maintenance_date: string | null;
+    last_production_date?: string | null;
+    open_incident_count?: number;
+}
+
+export interface AssetDetail extends Asset {
+    production_history?: Operation[];
+    maintenance_history?: MaintenanceRecord[];
+    incident_history?: Incident[];
 }
 
 export interface Incident {
     id: number;
+    company_id?: number | null;
+    asset_id?: number | null;
     company_name: string;
+    asset_name?: string | null;
     incident_type: string;
     severity: string;
     description: string;
     reported_by: string;
+    reported_by_user_id?: number | null;
     status: string;
     reported_date: string;
+    follow_up_note?: string | null;
+    follow_up_submitted_at?: string | null;
+    follow_up_submitted_by_name?: string | null;
+    resolved_at?: string | null;
+    closed_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface IncidentEvent {
+    id: number;
+    incident_id: number;
+    event_type: string;
+    actor_user_id?: number | null;
+    actor_name?: string | null;
+    actor_role?: string | null;
+    from_status?: string | null;
+    to_status?: string | null;
+    note?: string | null;
+    created_at: string;
+}
+
+export interface IncidentDetail extends Incident {
+    reported_by_name?: string | null;
+    resolved_at?: string | null;
+    resolved_by_name?: string | null;
+    closed_at?: string | null;
+    closed_by_name?: string | null;
+    events?: IncidentEvent[];
 }
 
 export interface Contractor {
@@ -374,6 +450,8 @@ export interface WorkOrder {
 export interface MaintenanceRecord {
     id: number;
     asset_id: number;
+    company_id?: number | null;
+    company_name?: string | null;
     asset_name: string;
     maintenance_type: string;
     description: string;

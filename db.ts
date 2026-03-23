@@ -20,3 +20,4 @@ export const pool = new sql.ConnectionPool({
 
 export const poolConnect = pool.connect();
 export { sql };
+

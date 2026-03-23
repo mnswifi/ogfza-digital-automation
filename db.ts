@@ -8,7 +8,7 @@ export const pool = new sql.ConnectionPool({
     port: Number(process.env.DB_PORT || 1433),
     database: process.env.DB_NAME || "PetroflowDB",
     options: {
-        encrypt: false,
+        encrypt: process.env.DB_ENCRYPT === "true",
         trustServerCertificate: true,
     },
     pool: {
